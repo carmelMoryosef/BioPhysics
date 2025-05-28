@@ -160,6 +160,7 @@ def analyze_all_pictures(image_folder):
         # mask = analyze_bacteria(f"./{rel_path}")
         mask = analyze_bacteria(str(image_path.absolute()))
         # show_image(mask)
+        #but its too late for my brain
     print(f"[!] Done!")
 
 
