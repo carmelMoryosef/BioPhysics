@@ -146,6 +146,7 @@ def show_image(image_path):
     image = ij.io().open(image_path)
     ij.ui().show("Image", image)
     input("Press Enter to close...")
+    #david teaching me stuff
 
 
 def analyze_all_pictures(image_folder):
