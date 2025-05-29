@@ -204,8 +204,8 @@ def mean_value_at_black_mask(image_path: str, mask_path: str) -> float:
     # Convert to NumPy arrays
     image_array = np.array(image)
     mask_array = np.array(mask)
-    print(image_array.shape, mask_array.shape)
-    print(image_array)
+    # print(image_array.shape, mask_array.shape)
+    # print(image_array)
     # csv_file = r"C:\Users\carme\OneDrive\Documents\BioPhysics_tests\text image.csv"  # Replace with your CSV file path
     # data = pd.read_csv(csv_file, header=None)
     #
@@ -244,6 +244,58 @@ def mean_value_at_black_mask(image_path: str, mask_path: str) -> float:
 
     return np.mean(bacteria_pixel_values) #/ np.mean(image_array)
 
+def mean_value_at_white_mask(image_path: str, mask_path: str) -> float: #mean value of background
+    # Load and convert to grayscale
+    image = Image.open(image_path)#.convert("L")
+    mask = Image.open(mask_path).convert("L")
+    # image = ImageOps.grayscale(image)
+    # image = rgb2gray(Image.open(image_path).convert("RGB"))
+    # mask = rgb2gray(Image.open(mask_path).convert("RGB"))
+    # image = rgb2gray(cv2.imread(image_path, cv2.IMREAD_UNCHANGED))
+    # mask = rgb2gray(cv2.imread(mask_path, cv2.IMREAD_UNCHANGED))
+
+    # Convert to NumPy arrays
+    image_array = np.array(image)
+    mask_array = np.array(mask)
+    # print(image_array.shape, mask_array.shape)
+    # print(image_array)
+    # csv_file = r"C:\Users\carme\OneDrive\Documents\BioPhysics_tests\text image.csv"  # Replace with your CSV file path
+    # data = pd.read_csv(csv_file, header=None)
+    #
+    # # Convert to NumPy array (if it's numerical)
+    # data_array = data.values
+    #
+    # # Plot the data as an image
+    # plt.imshow(data_array, cmap='gray', aspect='auto')
+    # plt.colorbar(label='Value')
+    # plt.title('CSV Data as Image')
+    # plt.xlabel('Columns')
+    # plt.ylabel('Rows')
+    # plt.show()
+
+    # image_array = load_tiff_grayscale(image_path)
+    # mask_array = load_tiff_grayscale(mask_path)
+    # mask_array = mask / np.sum(mask)
+
+    # Sanity check: Ensure dimensions match
+    if image_array.shape != mask_array.shape:
+        raise ValueError("Image and mask must have the same dimensions.")
+
+    # Find coordinates where mask is black
+    y_coords, x_coords = np.where(mask_array == np.max(mask_array))
+    background_pixel_values = image_array[y_coords, x_coords]
+    # print(len(background_pixel_values ))
+    # print(image_path)
+    # print(np.min(image_array), np.max(image_array))
+    # Plot the image
+    # plt.figure(figsize=(8, 8))
+    # plt.imshow(image_array, cmap='gray')
+    # # plt.scatter(x_coords, y_coords, c='red', s=1, label='Black Mask Pixels')  # red overlay
+    # plt.title(f'Image background for {image_path.split("\\")[-1]}')
+    # plt.axis('off')
+    # plt.show()
+
+    return np.mean(background_pixel_values ) #/ np.mean(image_array)
 
 def extract_numeric_prefix(filename: str) -> int:
     """Extract the number before the first underscore."""
@@ -280,7 +332,8 @@ def process_gfp_images(folder_path: str):
                 x_value = extract_numeric_prefix(filename)
                 # print(x_value)
                 mean_val = mean_value_at_black_mask(image_path, mask_path)
-                results.append((x_value, mean_val))
+                background_mean_val = mean_value_at_white_mask(image_path, mask_path)
+                results.append((x_value, mean_val, background_mean_val))# i added background simple value
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
             # else:
@@ -289,11 +342,13 @@ def process_gfp_images(folder_path: str):
     # Sort by x-value (numeric prefix)
     results.sort(key=lambda x: x[0])
     print(results)
-    x_vals, y_vals = zip(*results)
+    x_vals, y_vals,BG_vals = zip(*results)
 
     # Plot
     plt.figure(figsize=(8, 5))
     plt.scatter(x_vals, y_vals, marker='o')
+    plt.scatter(x_vals, BG_vals, marker='*')#mean background
+    # plt.scatter(x_vals, y_vals-BG_vals, marker='^')#mean bacteria-mean background but it dosent work because its tuples
     plt.xlabel("Consentration")
     plt.ylabel("Mean value in non-black mask region")
     plt.title("Mean GFP Intensity over Time/Image Index")
@@ -318,9 +373,9 @@ if __name__ == "__main__":
     # // mean = mean_value_at_black_mask("./data/basic_experiment/pictures/210_B_3_GFP_5000.tif", "./data/basic_experiment/pictures/masks/mask_210_B_3_Phase_100.tif")
     # // print("mean", mean)
 
-    # process_gfp_images(fr"{image_folder}\masks\\")
+    process_gfp_images(fr"{image_folder}\masks\\")
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\210_B_3_GFP_3000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
-    mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\masks\mask_140_B_3_GFP_5000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
+    # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\masks\mask_140_B_3_GFP_5000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
 
     # show_image(f"data/basic_experiment/pictures/masks/mask_210_B_1_Phase_100.tif")
     # show_image(r"G:\My Drive\bio_physics\pictures\masks\\mask_35_A_3_GFP_5000.tif")
