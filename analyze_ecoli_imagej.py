@@ -7,9 +7,12 @@ from imagej._java import jimport
 from pathlib import Path
 from PIL import Image, ImageOps
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import tifffile
 import pandas as pd
 import cv2
+from extract_files import extract_and_rename_images 
+from mask_enum import MaskType
 
 # Initialize ImageJ once (reuse in both functions)
 ij = imagej.init('sc.fiji:fiji', headless=False)
@@ -17,6 +20,10 @@ IJ = jimport('ij.IJ')
 Prefs = jimport('ij.Prefs')
 WM = jimport('ij.WindowManager')
 
+# BASE_FOLDER = r"G:/My Drive/bio_physics/pictures"
+BASE_FOLDER = "./data/basic_experiment/"
+PICTURE_FOLDER = "/pictures/"
+MASKS_FOLDER = "/masks/"
 PHASE_SUFFIX = "Phase_100.tif"
 MASK_PREFIX = "mask"
 GFP_FILE_INCLUDES = "GFP"
@@ -32,30 +39,11 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     Returns:
         count: int - Number of detected bacteria.
     """
-    # image = ij.io().open(image_path)
-
-    # # Convert to 8-bit grayscale (needed for Analyze Particles)
-    # image_gray = ij.op().run("convert.uint8", image)
-
-    # # Auto threshold (Otsu)
-    # thresholded = ij.op().run("threshold.otsu", image_gray)
-
-    # # Set threshold on image (required before Analyze Particles)
-    # ij.py.run_macro(f"""
-    #     setThreshold({thresholded.getMin()}, {thresholded.getMax()});
-    #     run("Convert to Mask");
-    #     run("Analyze Particles...", "size={min_size}-{max_size} display clear summarize");
-    # """)
-
-    # # Get number of rows in Results table = count of detected particles
-    # results_table = ij.WindowManager.getWindow("Results").getTextPanel().getLines()
-    # count = len(results_table) - 1  # First line is header
-
-    # # Close Results window to keep things clean
-    # ij.WindowManager.getWindow("Results").close()
     name = image_path.split("\\")[-1].split(".")[0]
-    # mask_path = f"./data/basic_experiment/pictures/masks/mask_{name}.tif"
-    mask_path = fr"G:\My Drive\bio_physics\pictures\masks\mask_{name}.tif"
+    dir_res = "\\".join(str(os.path.dirname(image_path)).split("\\")[:-1])
+    
+    mask_path = fr"{os.path.dirname(image_path)}\masks\mask_{name}.tif"
+    res_path = fr"{dir_res}\results\res_{name}.csv"
 
     if GFP_FILE_INCLUDES in name:
         shutil.copy2(image_path, mask_path)
@@ -69,7 +57,7 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     IJ.run(imp, "Enhance Contrast", "saturated=0.35")
     IJ.run(imp, "Apply LUT", "")
     IJ.run("Close")
-    # if GFP_FILE_INCLUDES not in name:
+    
     imp.setAutoThreshold("Default dark no-reset")
     IJ.setRawThreshold(imp, 0, 65535)
     IJ.setRawThreshold(imp, 0, 65535)
@@ -79,22 +67,14 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     Prefs.blackBackground = True
     IJ.run(imp, "Convert to Mask", "")
     IJ.run(imp, "Analyze Particles...", "size=30-110 show=Masks exclude clear summarize overlay")
-    IJ.saveAs("Results", fr"G:\My Drive\bio_physics\results_basic_experiment\res_{name}.csv")
-    # IJ.selectWindow(f"Mask of {name}")
-    # WM.getWindow(name).close()
-    # WM.getWindow(f"Mask of Image")
-    # IJ.selectWindow("Image (V)")
+    IJ.saveAs("Results", res_path)
     mask_imp = IJ.getImage()
     imp.changes = False
-    # IJ.run("Close")
     imp.close()
     IJ.saveAs(mask_imp, "Tiff", mask_path)
 
-
-    # IJ.saveAs(imp, "Tiff", mask_path)
     if with_pause:
         input("Press Enter to close...")
-    # IJ.saveAs("Results", f"./data/basic_experiment/results/res_{name}.csv")
     IJ.run("Close All")
 
     return mask_path
@@ -110,32 +90,13 @@ def show_marked_image(image_path, min_size=5, max_size=1e9):
     """
     image = ij.io().open(image_path)
     image_gray = ij.op().run("convert.uint8", image)
-    # thresholded = ij.op().run("threshold.otsu", image_gray)
-    # image_gray = ij.op().run("convert.uint8", image)
     ij.ui().show("Gray Image", image_gray)
-
-    # Apply threshold and convert to mask
-    # setThreshold({thresholded.getMin()}, {thresholded.getMax()});
-    # run("Convert to Mask");
-    # run("RGB Color");
-    # run("Color Balance...");
 
     # Apply histogram equalization or normalization
     equalized = ij.op().run("normalize", image)
 
     # Show result
     ij.ui().show("Auto Balanced (Simulated)", equalized)
-
-    # setAutoThreshold("Otsu");
-    # run("Analyze Particles...", "size={min_size}-{max_size} show=Outlines display clear summarize");
-    # ij.py.run_macro(f"""
-    #     open("{image_path}");
-    #     run("RGB Color");
-    #     run("Color Balance...");
-    #     call("ij.plugin.frame.ColorBalance.applyAuto");
-    # """)
-
-    # The above macro will open the image and show outlines in Fiji UI
 
     # Keep script running so the window stays open
     print("Threshold and analysis done. Leave this script running to inspect the window.")
@@ -161,7 +122,7 @@ def analyze_all_pictures(image_folder):
         mask = analyze_bacteria(str(image_path.absolute()))
         # show_image(mask)
         #but its too late for my brain
-    print(f"[!] Done!")
+    print(f"[V] Done!")
 
 
 def load_tiff_grayscale(filepath):
@@ -190,112 +151,37 @@ def load_tiff_grayscale(filepath):
 # def rgb2gray(rgb):
 #     return np.dot(rgb[..., :3], [0.2989, 0.5870, 0.1140])
 
-def mean_value_at_black_mask(image_path: str, mask_path: str) -> float:
+def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, plot_each_image:bool=False) -> float:
     # Load and convert to grayscale
     image = Image.open(image_path)#.convert("L")
     mask = Image.open(mask_path).convert("L")
-    # image = ImageOps.grayscale(image)
-    # image = rgb2gray(Image.open(image_path).convert("RGB"))
-    # mask = rgb2gray(Image.open(mask_path).convert("RGB"))
-    # image = rgb2gray(cv2.imread(image_path, cv2.IMREAD_UNCHANGED))
-    # mask = rgb2gray(cv2.imread(mask_path, cv2.IMREAD_UNCHANGED))
 
-
-    # Convert to NumPy arrays
     image_array = np.array(image)
     mask_array = np.array(mask)
-    # print(image_array.shape, mask_array.shape)
-    # print(image_array)
-    # csv_file = r"C:\Users\carme\OneDrive\Documents\BioPhysics_tests\text image.csv"  # Replace with your CSV file path
-    # data = pd.read_csv(csv_file, header=None)
-    #
-    # # Convert to NumPy array (if it's numerical)
-    # data_array = data.values
-    #
-    # # Plot the data as an image
-    # plt.imshow(data_array, cmap='gray', aspect='auto')
-    # plt.colorbar(label='Value')
-    # plt.title('CSV Data as Image')
-    # plt.xlabel('Columns')
-    # plt.ylabel('Rows')
-    # plt.show()
-
-    # image_array = load_tiff_grayscale(image_path)
-    # mask_array = load_tiff_grayscale(mask_path)
-    # mask_array = mask / np.sum(mask)
 
     # Sanity check: Ensure dimensions match
     if image_array.shape != mask_array.shape:
         raise ValueError("Image and mask must have the same dimensions.")
 
     # Find coordinates where mask is black
-    y_coords, x_coords = np.where(mask_array == np.min(mask_array))
-    bacteria_pixel_values = image_array[y_coords, x_coords]
-    print(len(bacteria_pixel_values))
-    print(image_path)
-    print(np.min(image_array), np.max(image_array))
-    # Plot the image
-    plt.figure(figsize=(8, 8))
-    plt.imshow(image_array, cmap='gray')
-    # plt.scatter(x_coords, y_coords, c='red', s=1, label='Black Mask Pixels')  # red overlay
-    plt.title(f'Image for {image_path.split("\\")[-1]}')
-    plt.axis('off')
-    plt.show()
-
-    return np.mean(bacteria_pixel_values) #/ np.mean(image_array)
-
-def mean_value_at_white_mask(image_path: str, mask_path: str) -> float: #mean value of background
-    # Load and convert to grayscale
-    image = Image.open(image_path)#.convert("L")
-    mask = Image.open(mask_path).convert("L")
-    # image = ImageOps.grayscale(image)
-    # image = rgb2gray(Image.open(image_path).convert("RGB"))
-    # mask = rgb2gray(Image.open(mask_path).convert("RGB"))
-    # image = rgb2gray(cv2.imread(image_path, cv2.IMREAD_UNCHANGED))
-    # mask = rgb2gray(cv2.imread(mask_path, cv2.IMREAD_UNCHANGED))
-
-    # Convert to NumPy arrays
-    image_array = np.array(image)
-    mask_array = np.array(mask)
-    # print(image_array.shape, mask_array.shape)
-    # print(image_array)
-    # csv_file = r"C:\Users\carme\OneDrive\Documents\BioPhysics_tests\text image.csv"  # Replace with your CSV file path
-    # data = pd.read_csv(csv_file, header=None)
-    #
-    # # Convert to NumPy array (if it's numerical)
-    # data_array = data.values
-    #
-    # # Plot the data as an image
-    # plt.imshow(data_array, cmap='gray', aspect='auto')
-    # plt.colorbar(label='Value')
-    # plt.title('CSV Data as Image')
-    # plt.xlabel('Columns')
-    # plt.ylabel('Rows')
-    # plt.show()
-
-    # image_array = load_tiff_grayscale(image_path)
-    # mask_array = load_tiff_grayscale(mask_path)
-    # mask_array = mask / np.sum(mask)
-
-    # Sanity check: Ensure dimensions match
-    if image_array.shape != mask_array.shape:
-        raise ValueError("Image and mask must have the same dimensions.")
-
-    # Find coordinates where mask is black
-    y_coords, x_coords = np.where(mask_array == np.max(mask_array))
-    background_pixel_values = image_array[y_coords, x_coords]
-    # print(len(background_pixel_values ))
+    y_coords, x_coords = np.where(mask_array == mask_type.value)
+    pixel_values = image_array[y_coords, x_coords]
+    # print(len(pixel_values))
     # print(image_path)
     # print(np.min(image_array), np.max(image_array))
-    # Plot the image
-    # plt.figure(figsize=(8, 8))
-    # plt.imshow(image_array, cmap='gray')
-    # # plt.scatter(x_coords, y_coords, c='red', s=1, label='Black Mask Pixels')  # red overlay
-    # plt.title(f'Image background for {image_path.split("\\")[-1]}')
-    # plt.axis('off')
-    # plt.show()
+    
+    if plot_each_image:
+        # Plot the image
+        plt.figure(figsize=(8, 8))
+        plt.imshow(image_array, cmap='gray')
+        plt.colorbar(label='Value')
+        # plt.scatter(x_coords, y_coords, c='red', s=1, label='Black Mask Pixels')  # red overlay
+        plt.title(f'Image for {os.path.basename(image_path)}')
+        plt.axis('off')
+        plt.show()
 
-    return np.mean(background_pixel_values ) #/ np.mean(image_array)
+    return np.mean(pixel_values) #/ np.mean(image_array)
+
 
 def extract_numeric_prefix(filename: str) -> int:
     """Extract the number before the first underscore."""
@@ -306,6 +192,8 @@ def extract_numeric_prefix(filename: str) -> int:
     else:
         raise ValueError(f"[X] Filename does not start with a number: {filename}")
 
+def get_exposure(filename:str):
+    return int(filename.split("_")[-1].split(".")[0])
 
 def process_gfp_images(folder_path: str):
     """
@@ -321,19 +209,23 @@ def process_gfp_images(folder_path: str):
     for filename in os.listdir(folder_path):
         if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
             base_name = os.path.split(filename)[0]
-            print("filename", filename, base_name)
+            # print("filename", filename, base_name)
             image_path = folder_path + filename  # os.path.join(folder_path, filename)
             mask_name = base_name + filename.split(GFP_FILE_INCLUDES)[0] + PHASE_SUFFIX
             mask_path = os.path.join(folder_path, mask_name)
 
-            print(image_path, mask_path)
+            exposure = get_exposure(filename)
+            # print(image_path, mask_path)
             # if os.path.exists(mask_path):
             try:
                 x_value = extract_numeric_prefix(filename)
                 # print(x_value)
-                mean_val = mean_value_at_black_mask(image_path, mask_path)
-                background_mean_val = mean_value_at_white_mask(image_path, mask_path)
-                results.append((x_value, mean_val, background_mean_val))# i added background simple value
+                mean_val = mean_value_at_mask(image_path, mask_path, MaskType.BLACK)
+                background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE)
+                # print(mean_val, background_mean_val)
+                if mean_val < background_mean_val:
+                    print(f"[?] The background is lighter then the bacteria - file {filename}")
+                results.append((x_value, mean_val - background_mean_val, exposure))# i added background simple value
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
             # else:
@@ -341,14 +233,16 @@ def process_gfp_images(folder_path: str):
 
     # Sort by x-value (numeric prefix)
     results.sort(key=lambda x: x[0])
-    print(results)
-    x_vals, y_vals,BG_vals = zip(*results)
+    # print(results)
+    x_vals, y_vals, exposure_vals = zip(*results)
+
+    cmap = plt.cm.rainbow
+    norm = mpl.colors.Normalize(vmin=min(exposure_vals), vmax=max(exposure_vals))
 
     # Plot
     plt.figure(figsize=(8, 5))
-    plt.scatter(x_vals, y_vals, marker='o')
-    plt.scatter(x_vals, BG_vals, marker='*')#mean background
-    # plt.scatter(x_vals, y_vals-BG_vals, marker='^')#mean bacteria-mean background but it dosent work because its tuples
+    plt.scatter(x_vals, y_vals, color=cmap(norm(exposure_vals)))
+    # plt.scatter(x_vals, BG_vals, marker='*')#mean background
     plt.xlabel("Consentration")
     plt.ylabel("Mean value in non-black mask region")
     plt.title("Mean GFP Intensity over Time/Image Index")
@@ -357,23 +251,12 @@ def process_gfp_images(folder_path: str):
     plt.show()
 
 
-# images = [
-#     "./data/basic_experiment/pictures/210_B_1_Phase_100.tif",
-#     "./data/basic_experiment/pictures/210_B_2_Phase_100.tif",
-#     "./data/basic_experiment/pictures/210_B_3_Phase_100.tif"
-# ]
-
-
 if __name__ == "__main__":
-    image_folder = r"G:\My Drive\bio_physics\pictures"
+    # extract_and_rename_images(BASE_FOLDER, f"{BASE_FOLDER}/{PICTURE_FOLDER}")
     # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")
-    # analyze_all_pictures(image_folder)
-    # // mean = mean_value_at_black_mask("./data/basic_experiment/pictures/210_B_1_GFP_800.tif", "./data/basic_experiment/pictures/masks/mask_210_B_1_Phase_100.tif")
-    # // print("mean", mean)
-    # // mean = mean_value_at_black_mask("./data/basic_experiment/pictures/210_B_3_GFP_5000.tif", "./data/basic_experiment/pictures/masks/mask_210_B_3_Phase_100.tif")
-    # // print("mean", mean)
+    # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
 
-    process_gfp_images(fr"{image_folder}\masks\\")
+    process_gfp_images(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}")
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\210_B_3_GFP_3000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\masks\mask_140_B_3_GFP_5000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
 

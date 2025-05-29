@@ -37,5 +37,5 @@ def extract_and_rename_images(src_root, dst_root):
                 shutil.copy(img_file, dst_path)
                 print(f"[+] Saved {dst_path}")
 
-if __name__ == "__main__":
-    extract_and_rename_images(r"G:\My Drive\bio_physics\20250520", r"G:\My Drive\bio_physics\pictures")
+# if __name__ == "__main__":
+#     extract_and_rename_images(r"G:\My Drive\bio_physics\20250520", r"G:\My Drive\bio_physics\pictures")
