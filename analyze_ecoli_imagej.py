@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import tifffile
 import pandas as pd
-import cv2
+# import cv2
 from extract_files import extract_and_rename_images 
 from mask_enum import MaskType
 
