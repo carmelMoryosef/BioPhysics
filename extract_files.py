@@ -5,13 +5,12 @@ import shutil
 
 from pathlib import Path
 
-def extract_and_rename_images(src_root, dst_root):
+def extract_and_rename_images(src_root, dst_root, exclude_subfolders=None):
     src_root = Path(src_root)
     dst_root = Path(dst_root)
     dst_root.mkdir(parents=True, exist_ok=True)
-
     for subfolder in src_root.iterdir():
-        if subfolder.is_dir():
+        if subfolder.is_dir() and subfolder.name not in exclude_subfolders:
             folder_name = subfolder.name
 
             # Locate JSON .txt file
@@ -29,8 +28,12 @@ def extract_and_rename_images(src_root, dst_root):
 
             # Process .tif images
             for img_file in subfolder.glob("**/*.tif"):
+                print(img_file)
                 file_data = metadata.get(f"Metadata-Default/{img_file.name}")
-                exposure = int(file_data["Exposure-ms"])
+                if "Exposure-ms" in file_data:
+                    exposure = int(file_data["Exposure-ms"])
+                else:
+                    exposure = int(float(file_data["Camera-1-Exposure"]))
                 channel_index = file_data["ChannelIndex"]
                 new_name = f"{folder_name}_{channel_list[channel_index]}_{exposure}.tif"
                 dst_path = dst_root / new_name
