@@ -13,6 +13,7 @@ import pandas as pd
 # import cv2
 from extract_files import extract_and_rename_images 
 from mask_enum import MaskType
+from os import path
 
 # Initialize ImageJ once (reuse in both functions)
 ij = imagej.init('sc.fiji:fiji', headless=False)
@@ -20,10 +21,10 @@ IJ = jimport('ij.IJ')
 Prefs = jimport('ij.Prefs')
 WM = jimport('ij.WindowManager')
 
-# BASE_FOLDER = r"G:/My Drive/bio_physics/pictures"
-BASE_FOLDER = "./data/basic_experiment/"
-PICTURE_FOLDER = "/pictures/"
-MASKS_FOLDER = "/masks/"
+BASE_FOLDER = r"G:/My Drive/bio_physics"
+# BASE_FOLDER = "./data/basic_experiment/"
+PICTURE_FOLDER = "pictures"
+MASKS_FOLDER = "masks"
 PHASE_SUFFIX = "Phase_100.tif"
 MASK_PREFIX = "mask"
 GFP_FILE_INCLUDES = "GFP"
@@ -210,7 +211,7 @@ def process_gfp_images(folder_path: str):
         if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
             base_name = os.path.split(filename)[0]
             # print("filename", filename, base_name)
-            image_path = folder_path + filename  # os.path.join(folder_path, filename)
+            image_path = os.path.join(folder_path, filename)
             mask_name = base_name + filename.split(GFP_FILE_INCLUDES)[0] + PHASE_SUFFIX
             mask_path = os.path.join(folder_path, mask_name)
 
@@ -256,7 +257,7 @@ if __name__ == "__main__":
     # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")
     # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
 
-    process_gfp_images(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}")
+    process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\210_B_3_GFP_3000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\masks\mask_140_B_3_GFP_5000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
 
