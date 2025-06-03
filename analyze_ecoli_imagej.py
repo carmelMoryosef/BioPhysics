@@ -20,7 +20,7 @@ ij = imagej.init('sc.fiji:fiji', headless=False)
 IJ = jimport('ij.IJ')
 Prefs = jimport('ij.Prefs')
 WM = jimport('ij.WindowManager')
-DarkCounts= 103.739
+DARK_COUNT= 103.739
 BASE_FOLDER = r"G:/My Drive/bio_physics"
 # BASE_FOLDER = "./data/basic_experiment/"
 PICTURE_FOLDER = "pictures"
@@ -28,7 +28,7 @@ MASKS_FOLDER = "masks"
 PHASE_SUFFIX = "Phase_100.tif"
 MASK_PREFIX = "mask"
 GFP_FILE_INCLUDES = "GFP"
-BACK_GROUND = r'BackGround\20250527' #background folder
+BACKGROUND = r'BackGround\20250527' #background folder
 
 
 exclude_subfolders = ["20250518"]
@@ -154,11 +154,11 @@ def load_tiff_grayscale(filepath):
 
 # def rgb2gray(rgb):
 #     return np.dot(rgb[..., :3], [0.2989, 0.5870, 0.1140])
-def back_ground_picture(BG_folder_path):
+def background_picture_gradient(bg_folder_path):
     """
-    Computes the mean background image from all subfolders in BASE_FOLDER/BackGround/BG_folder_pathg.
+    Computes the mean background image from all subfolders in BASE_FOLDER/BackGround/BG_folder_path.
     Assumes each folder contains another subfolder where the background image is located.
-    also sabstract darkcount value
+    also subtract darkcount value
 
     Args:
         BG_folder_pathg (str): Subdirectory inside BackGround containing folders with background image subfolders.
@@ -166,7 +166,7 @@ def back_ground_picture(BG_folder_path):
     Returns:
         np.ndarray: Averaged background image.
     """
-    full_bg_dir = os.path.join(BASE_FOLDER, BG_folder_path)
+    full_bg_dir = os.path.join(BASE_FOLDER, bg_folder_path)
     if not os.path.exists(full_bg_dir):
         raise FileNotFoundError(f"Background path not found: {full_bg_dir}")
 
@@ -203,27 +203,27 @@ def back_ground_picture(BG_folder_path):
         raise ValueError("No valid background images found.")
 
     stacked_images = np.stack(image_list, axis=0)
-    mean_image = np.mean(stacked_images, axis=0) - DarkCounts
+    mean_image = np.mean(stacked_images, axis=0) - DARK_COUNT
 
     print(f"[V] Averaged {len(image_list)} background images.")
     return mean_image
 
-def back_ground_reduction(image,BG_Picture):
-    # befor extracting pixel corelated to mask, background reductions shold be made in this order:
+def background_adjustments(image, bg_picture):
+    # before extracting pixel correlated to mask, background reductions should be made in this order:
     # dark count subtract
-    # deviding by mean BG picture
-    image = image - DarkCounts
-    image_withnoBG = image/BG_Picture
-    plt.imshow(image_withnoBG, cmap="gray")
+    # dividing by mean BG picture
+    image = image - DARK_COUNT
+    image_withnoBG = image / bg_picture
+    # plt.imshow(image_withnoBG, cmap="gray")
     return image_withnoBG
 
-def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, plot_each_image:bool=False) -> float:#TODO shchar: add veribal of BG_picture
+def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, bg_picture: str, plot_each_image:bool=False) -> float:
     # Load and convert to grayscale
     image = Image.open(image_path)#.convert("L")
     mask = Image.open(mask_path).convert("L")
 
     image_array = np.array(image)
-    #TODO shchar:do somthing like that: image_array=back_ground_reduction(image_array,BG_picture)
+    image_array = background_adjustments(image_array, )
     mask_array = np.array(mask)
 
     # Sanity check: Ensure dimensions match
@@ -272,6 +272,7 @@ def process_gfp_images(folder_path: str):
       - The prefix before the first underscore is a number used for x-axis.
     """
     results = []
+    bg_gradient = background_picture_gradient(BACKGROUND)
 
     for filename in os.listdir(folder_path):
         if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
@@ -287,8 +288,8 @@ def process_gfp_images(folder_path: str):
             try:
                 x_value = extract_numeric_prefix(filename)
                 # print(x_value)
-                mean_val = mean_value_at_mask(image_path, mask_path, MaskType.BLACK)
-                background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE) #TODO ? ,back_ground_picture(BACK_GROUND))
+                mean_val = mean_value_at_mask(image_path, mask_path, MaskType.BLACK, bg_gradient)
+                background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
                 # print(mean_val, background_mean_val)
                 if mean_val < background_mean_val:
                     print(f"[?] The background is lighter then the bacteria - file {filename}")
@@ -310,7 +311,7 @@ def process_gfp_images(folder_path: str):
     plt.figure(figsize=(8, 5))
     plt.scatter(x_vals, y_vals, color=cmap(norm(exposure_vals)))
     plt.scatter(x_vals, background_mean_val, marker="*", color=cmap(norm(exposure_vals)))
-    plt.ylim((0,1100))
+    # plt.ylim((0,1100))
     # plt.scatter(x_vals, BG_vals, marker='*')#mean background
     plt.xlabel("Inducer")
     plt.ylabel("Mean value in non-black mask region")
@@ -322,11 +323,11 @@ def process_gfp_images(folder_path: str):
 
 if __name__ == "__main__":
     #TODO shachar fix the folders so it can loop over all the dates folders
-    bg_mean = back_ground_picture(BACK_GROUND)
-    plt.imshow(bg_mean, cmap="gray")
-    plt.title("Mean Background Image")
-    plt.colorbar()
-    plt.show()
+    # bg_mean = background_picture_gradient(BACKGROUND)
+    # plt.imshow(bg_mean, cmap="gray")
+    # plt.title("Mean Background Image")
+    # plt.colorbar()
+    # plt.show()
 
     # extract_and_rename_images(f"{BASE_FOLDER}/20250520/", f"{BASE_FOLDER}/{PICTURE_FOLDER}", exclude_subfolders)
     # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")
