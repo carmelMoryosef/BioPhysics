@@ -10,7 +10,7 @@ def extract_and_rename_images(src_root, dst_root, exclude_subfolders=None):
     dst_root = Path(dst_root)
     dst_root.mkdir(parents=True, exist_ok=True)
     for subfolder in src_root.iterdir():
-        if subfolder.is_dir() and subfolder.name not in exclude_subfolders:
+        if subfolder.is_dir(): #and subfolder.name not in exclude_subfolders: python dont like that thers a nan...
             folder_name = subfolder.name
 
             # Locate JSON .txt file
@@ -40,5 +40,5 @@ def extract_and_rename_images(src_root, dst_root, exclude_subfolders=None):
                 shutil.copy(img_file, dst_path)
                 print(f"[+] Saved {dst_path}")
 
-# if __name__ == "__main__":
-#     extract_and_rename_images(r"G:\My Drive\bio_physics\20250520", r"G:\My Drive\bio_physics\pictures")
+if __name__ == "__main__":
+    extract_and_rename_images(r"G:\My Drive\bio_physics\20250603", r"G:\My Drive\bio_physics\pictures")

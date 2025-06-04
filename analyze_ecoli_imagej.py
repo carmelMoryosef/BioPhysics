@@ -26,6 +26,8 @@ BASE_FOLDER = r"G:/My Drive/bio_physics"
 PICTURE_FOLDER = "pictures"
 MASKS_FOLDER = "masks"
 PHASE_SUFFIX = "Phase_100.tif"
+PHASE_SUFFIX1000 = "Phase_1000.tif"
+PHASE_SUFFIX700 = "Default_700.tif"
 MASK_PREFIX = "mask"
 GFP_FILE_INCLUDES = "GFP"
 BACKGROUND = r'BackGround\20250527' #background folder
@@ -223,7 +225,7 @@ def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, bg_
     mask = Image.open(mask_path).convert("L")
 
     image_array = np.array(image)
-    image_array = background_adjustments(image_array, )
+    image_array = background_adjustments(image_array,bg_picture )
     mask_array = np.array(mask)
 
     # Sanity check: Ensure dimensions match
@@ -293,9 +295,36 @@ def process_gfp_images(folder_path: str):
                 # print(mean_val, background_mean_val)
                 if mean_val < background_mean_val:
                     print(f"[?] The background is lighter then the bacteria - file {filename}")
-                results.append((x_value, mean_val - background_mean_val, background_mean_val, exposure))# i added background simple value
+                results.append((x_value, mean_val-background_mean_val , background_mean_val, exposure))# i added background simple value
             except Exception as e:
-                print(f"Error processing {filename}: {e}")
+                try:
+                    mask_name = base_name + filename.split(GFP_FILE_INCLUDES)[0] + PHASE_SUFFIX1000
+                    mask_path = os.path.join(folder_path, mask_name)
+                    x_value = extract_numeric_prefix(filename)
+                    # print(x_value)
+                    mean_val = mean_value_at_mask(image_path, mask_path, MaskType.BLACK, bg_gradient)
+                    background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
+                    # print(mean_val, background_mean_val)
+                    if mean_val < background_mean_val:
+                        print(f"[?] The background is lighter then the bacteria - file {filename}")
+                    results.append((x_value, mean_val - background_mean_val, background_mean_val,
+                                    exposure))  # i added background simple value
+                except Exception as e:
+                    try:
+                        mask_name = base_name + filename.split(GFP_FILE_INCLUDES)[0] + PHASE_SUFFIX700
+                        mask_path = os.path.join(folder_path, mask_name)
+                        x_value = extract_numeric_prefix(filename)
+                        # print(x_value)
+                        mean_val = mean_value_at_mask(image_path, mask_path, MaskType.BLACK, bg_gradient)
+                        background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
+                        # print(mean_val, background_mean_val)
+                        if mean_val < background_mean_val:
+                            print(f"[?] The background is lighter then the bacteria - file {filename}")
+                        results.append((x_value, mean_val - background_mean_val, background_mean_val,
+                                        exposure))  # i added background simple value
+                    except Exception as e:
+                        print(f"Error processing {filename}: {e}")
+
             # else:
             #     print(f"Mask not found for {filename}")
 
