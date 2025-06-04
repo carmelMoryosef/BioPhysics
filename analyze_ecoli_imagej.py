@@ -31,7 +31,7 @@ GFP_FILE_INCLUDES = "GFP"
 BACKGROUND = r'BackGround\20250527' #background folder
 
 
-exclude_subfolders = ["20250518"]
+exclude_subfolders = ["20250518", "BackGround"]
 
 def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     """
@@ -45,8 +45,11 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     """
     name = image_path.split("\\")[-1].split(".")[0]
     dir_res = "\\".join(str(os.path.dirname(image_path)).split("\\")[:-1])
+    dst_root_src = fr"{os.path.dirname(image_path)}\{MASKS_FOLDER}"
+    dst_root = Path(dst_root_src)
+    dst_root.mkdir(parents=True, exist_ok=True)
     
-    mask_path = fr"{os.path.dirname(image_path)}\masks\mask_{name}.tif"
+    mask_path = f"{dst_root_src}\mask_{name}.tif"
     res_path = fr"{dir_res}\results\res_{name}.csv"
 
     if GFP_FILE_INCLUDES in name:
@@ -223,7 +226,7 @@ def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, bg_
     mask = Image.open(mask_path).convert("L")
 
     image_array = np.array(image)
-    image_array = background_adjustments(image_array, )
+    image_array = background_adjustments(image_array, bg_picture)
     mask_array = np.array(mask)
 
     # Sanity check: Ensure dimensions match
@@ -252,10 +255,10 @@ def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, bg_
 
 def extract_numeric_prefix(filename: str) -> int:
     """Extract the number before the first underscore."""
-    match = re.match(rf"{MASK_PREFIX}_(\d+)_", filename)
+    match = re.match(rf"{MASK_PREFIX}_(\d+)_([\d_]+)_([A-Za-z])_", filename)
 
     if match:
-        return int(match.group(1))
+        return float(".".join(match.group(2).split("_")))
     else:
         raise ValueError(f"[X] Filename does not start with a number: {filename}")
 
@@ -266,25 +269,45 @@ def process_gfp_images(folder_path: str):
     """
     Finds all 'GFP' images in the folder, computes mean values for masked areas,
     and plots the results.
-    
+
     Assumes:
-      - Each GFP image has a corresponding mask with the same base name + mask_suffix.
-      - The prefix before the first underscore is a number used for x-axis.
+      - Each GFP image has a corresponding 'phase' image starting with the same
+        prefix and containing 'phase' (case-insensitive) somewhere after.
+      - The prefix may include underscores, and GFP filenames may have extra parts.
     """
     results = []
     bg_gradient = background_picture_gradient(BACKGROUND)
 
-    for filename in os.listdir(folder_path):
-        if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
-            base_name = os.path.split(filename)[0]
-            # print("filename", filename, base_name)
-            image_path = os.path.join(folder_path, filename)
-            mask_name = base_name + filename.split(GFP_FILE_INCLUDES)[0] + PHASE_SUFFIX
-            mask_path = os.path.join(folder_path, mask_name)
+    all_files = os.listdir(folder_path)
 
+    for filename in all_files:
+        if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
+            image_path = os.path.join(folder_path, filename)
+
+            # Try to extract prefix before "_GFP" or other suffix
+            prefix_match = re.match(r"(.+?)_(\d+)_GFP", filename)
+            dig = prefix_match.group(2)
+            prefix = prefix_match.group(1) if prefix_match else filename.split(GFP_FILE_INCLUDES)[0]
+            if len(dig) == 1:
+                prefix = prefix + f"_{dig}" 
+
+            # Search for a matching phase file
+            phase_file = None
+            for candidate in all_files:
+                if (candidate.startswith(prefix) and 
+                    # re.search(r'phase', candidate, re.IGNORECASE) and 
+                    not re.search(GFP_FILE_INCLUDES, candidate) and 
+                    candidate.endswith(".tif")):
+                    phase_file = candidate
+                    break
+
+            if not phase_file:
+                print(f"[!] No matching phase file found for {filename} with prefix {prefix}")
+                continue
+
+            mask_path = os.path.join(folder_path, phase_file)
             exposure = get_exposure(filename)
-            # print(image_path, mask_path)
-            # if os.path.exists(mask_path):
+            
             try:
                 x_value = extract_numeric_prefix(filename)
                 # print(x_value)
@@ -296,8 +319,10 @@ def process_gfp_images(folder_path: str):
                 results.append((x_value, mean_val - background_mean_val, background_mean_val, exposure))# i added background simple value
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
-            # else:
-            #     print(f"Mask not found for {filename}")
+
+    if not results:
+        print("[!] No valid results to plot.")
+        return
 
     # Sort by x-value (numeric prefix)
     results.sort(key=lambda x: x[0])
@@ -329,7 +354,7 @@ if __name__ == "__main__":
     # plt.colorbar()
     # plt.show()
 
-    # extract_and_rename_images(f"{BASE_FOLDER}/20250520/", f"{BASE_FOLDER}/{PICTURE_FOLDER}", exclude_subfolders)
+    # extract_and_rename_images(BASE_FOLDER, f"{BASE_FOLDER}/{PICTURE_FOLDER}", exclude_subfolders)
     # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")
     # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
 
