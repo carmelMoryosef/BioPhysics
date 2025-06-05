@@ -282,14 +282,17 @@ def process_gfp_images(folder_path: str):
 
     for filename in all_files:
         if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
-            image_path = os.path.join(folder_path, filename)
+            try:
+                image_path = os.path.join(folder_path, filename)
 
-            # Try to extract prefix before "_GFP" or other suffix
-            prefix_match = re.match(r"(.+?)_(\d+)_GFP", filename)
-            dig = prefix_match.group(2)
-            prefix = prefix_match.group(1) if prefix_match else filename.split(GFP_FILE_INCLUDES)[0]
-            if len(dig) == 1:
-                prefix = prefix + f"_{dig}" 
+                # Try to extract prefix before "_GFP" or other suffix
+                prefix_match = re.match(r"(.+?)_(\d+)_GFP", filename)
+                dig = prefix_match.group(2)
+                prefix = prefix_match.group(1) if prefix_match else filename.split(GFP_FILE_INCLUDES)[0]
+                if len(dig) == 1:
+                    prefix = prefix + f"_{dig}" 
+            except Exception as e:
+                print(f"Error in finding prefix {filename}: {e}")
 
             # Search for a matching phase file
             phase_file = None
