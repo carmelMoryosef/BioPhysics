@@ -14,6 +14,7 @@ import pandas as pd
 from extract_files import extract_and_rename_images 
 from mask_enum import MaskType
 from os import path
+import analyze_bacterium as bct
 
 # Initialize ImageJ once (reuse in both functions)
 ij = imagej.init('sc.fiji:fiji', headless=False)
@@ -21,17 +22,19 @@ IJ = jimport('ij.IJ')
 Prefs = jimport('ij.Prefs')
 WM = jimport('ij.WindowManager')
 DARK_COUNT= 103.739
-BASE_FOLDER = r"G:/My Drive/bio_physics"
+# BASE_FOLDER = r"G:/My Drive/bio_physics"
+BASE_FOLDER=r"G:\My Drive\bio_physics\CarmelShachar (1)"
 # BASE_FOLDER = "./data/basic_experiment/"
 PICTURE_FOLDER = "pictures"
 MASKS_FOLDER = "masks"
 PHASE_SUFFIX = "Phase_100.tif"
 MASK_PREFIX = "mask"
 GFP_FILE_INCLUDES = "GFP"
+TMP_FOLDER = "TMG"
 BACKGROUND = r'BackGround\20250527' #background folder
 
 
-exclude_subfolders = ["20250518", "BackGround"]
+exclude_subfolders = ["20250518", "BackGround","trash_measurments","20250520","20250603","20250608"]
 
 def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     """
@@ -49,7 +52,7 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     dst_root = Path(dst_root_src)
     dst_root.mkdir(parents=True, exist_ok=True)
     
-    mask_path = f"{dst_root_src}\mask_{name}.tif"
+    mask_path = fr"{dst_root_src}\mask_{name}.tif"
     res_path = fr"{dir_res}\results\res_{name}.csv"
 
     if GFP_FILE_INCLUDES in name:
@@ -74,7 +77,7 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     Prefs.blackBackground = True
     IJ.run(imp, "Convert to Mask", "")
     IJ.run(imp, "Analyze Particles...", "size=30-110 show=Masks exclude clear summarize overlay")
-    IJ.saveAs("Results", res_path)
+    # IJ.saveAs("Results", res_path)
     mask_imp = IJ.getImage()
     imp.changes = False
     imp.close()
@@ -319,7 +322,7 @@ def process_gfp_images(folder_path: str):
                 # print(mean_val, background_mean_val)
                 if mean_val < background_mean_val:
                     print(f"[?] The background is lighter then the bacteria - file {filename}")
-                results.append((x_value, mean_val - background_mean_val, background_mean_val, exposure))# i added background simple value
+                results.append((x_value, (mean_val-background_mean_val)*100, background_mean_val, exposure))# i added background simple value
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
 
@@ -338,7 +341,9 @@ def process_gfp_images(folder_path: str):
     # Plot
     plt.figure(figsize=(8, 5))
     plt.scatter(x_vals, y_vals, color=cmap(norm(exposure_vals)))
-    plt.scatter(x_vals, background_mean_val, marker="*", color=cmap(norm(exposure_vals)))
+    # plt.scatter(x_vals, background_mean_val, marker="*", color=cmap(norm(exposure_vals)))
+    # add y line at avrage of background_mean_val
+    # plt.plot([min(x_vals), max(x_vals)],[np.mean(background_mean_val),np.mean(background_mean_val)], color=cmap(norm(exposure_vals)))
     # plt.ylim((0,1100))
     # plt.scatter(x_vals, BG_vals, marker='*')#mean background
     plt.xlabel("Inducer")
@@ -357,11 +362,16 @@ if __name__ == "__main__":
     # plt.colorbar()
     # plt.show()
 
-    # extract_and_rename_images(BASE_FOLDER, f"{BASE_FOLDER}/{PICTURE_FOLDER}", exclude_subfolders)
-    # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")
-    # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
+    # extract_and_rename_images(f"{BASE_FOLDER}", f"{BASE_FOLDER}/{PICTURE_FOLDER}/{TMP_FOLDER}", exclude_subfolders)
+    # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")[!] analyzing 20250520_70_A_2_GFP_3000.tif...
+    # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{TMP_FOLDER}")
 
-    process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    # process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    indices, labeled = bct.detect_each_bacteria(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250610_18_5_A_100_Phase_TMG_1_Default_100.tif")
+    print(f"Found {len(indices)} bacteria.")
+
+
+    # print("First bacterium indices:", indices[0])
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\210_B_3_GFP_3000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\masks\mask_140_B_3_GFP_5000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
 
