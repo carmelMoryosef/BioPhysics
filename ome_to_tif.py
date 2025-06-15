@@ -3,6 +3,7 @@ import json
 import tifffile
 from ome_types import from_tiff
 from ome_types.model import OME, Image, Plane
+from analyze_ecoli_imagej import BASE_FOLDER
 
 
 # --- Part 1: Helper functions for ome_to_metadata ---
@@ -81,7 +82,7 @@ def _create_plane_metadata(
     })
 
     if plane.exposure_time is not None:
-        plane_metadata["Camera-1-Exposure"] = f"{plane.exposure_time * 1000:.2f}"
+        plane_metadata["Camera-1-Exposure"] = f"{plane.exposure_time }" #* 1000:.2f
         plane_metadata["Camera-1-Timing-ExposureTimeNs"] = f"{plane.exposure_time * 1e9:.4f}"
 
     plane_metadata["ScopeDataKeys"] = list(plane_metadata.keys())
@@ -184,7 +185,7 @@ if __name__ == "__main__":
     # Change this path to the root folder containing your experiment subdirectories.
     # For example: r"G:\My Drive\bio_physics\CarmelShachar\20250608"
     # Using "." will process the current working directory and its subfolders.
-    root_directory_to_process = r"G:\My Drive\bio_physics\CarmelShachar\20250608"
+    root_directory_to_process = rf"{BASE_FOLDER}\20250608"
 
     if not os.path.isdir(root_directory_to_process):
         print(f"Error: The specified directory does not exist: {root_directory_to_process}")

@@ -330,6 +330,14 @@ def process_gfp_images(folder_path: str):
         print("[!] No valid results to plot.")
         return
 
+def underscore_to_point(s: str) -> str:
+    """
+    Converts underscores in a string to periods.
+    """
+    return float(s.replace('_', '.')
+)
+
+#TODO remove code duplications
 def process_gfp_TMG_images(folder_path: str):
     """
     Finds all 'GFP' images in the folder, computes mean values for masked areas,
@@ -344,20 +352,33 @@ def process_gfp_TMG_images(folder_path: str):
 
     all_files = os.listdir(folder_path)
     All_ave_bact={}
+    # pattern = r'mask_\d+_(\d+_\d+_[A-Z])_(\d+)_GFP'
+    # pattern = r'mask_(?:_(\d+))?_(?:TMG|TMD)_(\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
+    # pattern = r'(.+?)_(\d+_\d+)_[A-Z]_(?:TMG|TMD)_(?:\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
+    pattern = r'(.+?)_(\d+_\d+)_[A-Z](?:_(?:\d+))?_(?:TMG|TMD)_(?:\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
+    exposure_pattern = r'mask_\d+_\d+_\d+_[A-Z]_\d+_GFP_TMG_Default_(\d+)'
 
     for filename in all_files:
         if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
             try:
                 image_path = os.path.join(folder_path, filename)
-
+                
+                match = re.search(pattern, filename)
+                if match:
+                    inducer = underscore_to_point(match.group(2))
+                    exposure = match.group(4)
+                        
                 # Try to extract prefix before "_GFP" or other suffix
+                #(.+?)_(\d+)_(?:TMG|TMD)_(\d+)_GFP
                 prefix_match = re.match(r"(.+?)_(\d+)_GFP", filename)
+                # prefix_match = re.match(r"(.+?)(?:_(\d+))?_(?:TMG|TMD)_(\d+)_GFP", filename)
                 dig = prefix_match.group(2)
                 prefix = prefix_match.group(1) if prefix_match else filename.split(GFP_FILE_INCLUDES)[0]
                 if len(dig) == 1:
                     prefix = prefix + f"_{dig}"
             except Exception as e:
                 print(f"Error in finding prefix {filename}: {e}")
+                continue
 
             # Search for a matching phase file
             phase_file = None
@@ -388,16 +409,25 @@ def process_gfp_TMG_images(folder_path: str):
                 #     print(f"[?] The background is lighter then the bacteria - file {filename}")
                 nbins=len(indices)//10
                 if len(indices)>1:
-                    All_ave_bact[filename] = avebacterium
-                    fig, (ax1,ax2) = plt.subplots(1,2)
-                    ax1.hist(avebacterium, bins=nbins)
-                    ax2.hist(np.log(avebacterium), bins=nbins)
-
-                    plt.title(f"Histogram for {filename}")
-                    plt.show()
-
+                    if (inducer, exposure) in All_ave_bact:
+                        #TODO carmel, like this? 
+                        All_ave_bact[(inducer, exposure)].extend(avebacterium)
+                    else:
+                        All_ave_bact[(inducer, exposure)] = avebacterium
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
+                
+    for (inducer, exposure), values in All_ave_bact.items():
+        nbins = max(10, len(values) // 10)
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+        ax1.hist(values, bins=nbins)
+        ax1.set_title(f"Distribution for {inducer}, Exposure {exposure}")
+        ax2.hist(np.log(values), bins=nbins)
+        ax2.set_title(f"Log-Distribution for {inducer}, Exposure {exposure}")
+        plt.tight_layout()
+        plt.show()
+
 
 
     return (All_ave_bact)
@@ -438,7 +468,7 @@ if __name__ == "__main__":
     # take all_ave_bacterium and make histogram for every sample (לאחד קבצים שונים של אותה דגימה)
 
 
-    # extract_and_rename_images(f"{BASE_FOLDER}/20250608", f"{BASE_FOLDER}/{PICTURE_FOLDER}/{TMP_FOLDER}", exclude_subfolders)
+    # extract_and_rename_images(f"{BASE_FOLDER}/20250608", f"{BASE_FOLDER}/{PICTURE_FOLDER}/{TMG_FOLDER}", exclude_subfolders)
     # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")[!] analyzing 20250520_70_A_2_GFP_3000.tif...
     # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
 
