@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 from skimage import io, measure, morphology
 from skimage.color import label2rgb
 
-
-def detect_each_bacteria(image_path, show_plot=True):
+def detect_each_bacteria(image_path, show_plot=False):
     """
     Analyzes individual E. coli bacteria in a mask image.
 
@@ -13,14 +12,17 @@ def detect_each_bacteria(image_path, show_plot=True):
     - show_plot: bool, whether to display a plot of the labeled bacteria
 
     Returns:
-    - bacteria_indices: List of lists, where each sublist contains
-      the flattened pixel indices of a single bacterium
-    - labeled_image: The labeled image where each bacterium has a unique integer label
+    - bacteria_indices: List of lists, each containing flattened pixel indices of a single bacterium
+    - labeled_image: Labeled image where each bacterium has a unique integer label
+    - avg_intensities: List of average grayscale intensities for each bacterium
     """
-    # Step 1: Load grayscale image
+    # Step 1: Load original grayscale image
     image = io.imread(image_path, as_gray=True)
 
-    # Step 2: Threshold to binary
+    # Preserve the original for intensity measurements
+    original_image = image.copy()
+
+    # Step 2: Threshold to binary (for detecting bacteria)
     binary = image > 0.5
 
     # Step 3: Clean noise
@@ -31,14 +33,21 @@ def detect_each_bacteria(image_path, show_plot=True):
     labeled_image = measure.label(cleaned, connectivity=2)
     regions = measure.regionprops(labeled_image)
 
-    # Step 5: Extract flattened indices per bacterium
+    # Step 5: Extract flattened indices and average intensity per bacterium
     shape = image.shape
-    bacteria_indices = [
-        [np.ravel_multi_index((r, c), shape) for r, c in region.coords]
-        for region in regions
-    ]
+    bacteria_indices = []
+    avg_intensities = []
 
-    # Step 6: Visualize colored labels
+    for region in regions:
+        coords = region.coords
+        flat_indices = [np.ravel_multi_index((r, c), shape) for r, c in coords]
+        bacteria_indices.append(flat_indices)
+
+        # Compute average intensity using the original image
+        intensity_values = [original_image[r, c] for r, c in coords]
+        avg_intensities.append(np.mean(intensity_values))
+
+    # Step 6: Visualize labeled regions
     if show_plot:
         colored_labels = label2rgb(labeled_image, bg_label=0)
         plt.figure(figsize=(8, 8))
@@ -47,5 +56,29 @@ def detect_each_bacteria(image_path, show_plot=True):
         plt.axis("off")
         plt.show()
 
-    return bacteria_indices, labeled_image
+    return bacteria_indices, labeled_image, avg_intensities
 
+import numpy as np
+
+def compute_bacteria_intensities(image_path, bacteria_indices):
+    """
+    Computes average grayscale intensity for each bacterium in the given image.
+
+    Parameters:
+    - image: 2D NumPy array (grayscale image)
+    - bacteria_indices: List of lists with flattened pixel indices for each bacterium
+
+    Returns:
+    - List of average intensities for each bacterium
+    """
+    image = io.imread(image_path, as_gray=True)
+    shape = image.shape
+
+    # Convert flattened indices back to 2D and compute mean intensity
+    avg_intensities = []
+    for flat_index_list in bacteria_indices:
+        coords = np.unravel_index(flat_index_list, shape)
+        intensity_values = image[coords]
+        avg_intensities.append(np.mean(intensity_values))
+
+    return avg_intensities

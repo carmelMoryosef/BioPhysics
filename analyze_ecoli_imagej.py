@@ -30,11 +30,11 @@ MASKS_FOLDER = "masks"
 PHASE_SUFFIX = "Phase_100.tif"
 MASK_PREFIX = "mask"
 GFP_FILE_INCLUDES = "GFP"
-TMP_FOLDER = "TMG"
+TMG_FOLDER = "TMG"
 BACKGROUND = r'BackGround\20250527' #background folder
 
 
-exclude_subfolders = ["20250518", "BackGround","trash_measurments","20250520","20250603","20250608"]
+exclude_subfolders = ["20250518", "BackGround","trash_measurments","20250520","20250603"]
 
 def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     """
@@ -330,6 +330,78 @@ def process_gfp_images(folder_path: str):
         print("[!] No valid results to plot.")
         return
 
+def process_gfp_TMG_images(folder_path: str):
+    """
+    Finds all 'GFP' images in the folder, computes mean values for masked areas,
+    and plots the results.
+
+    Assumes:
+      - Each GFP image has a corresponding 'phase' image starting with the same
+        prefix and containing 'phase' (case-insensitive) somewhere after.
+      - The prefix may include underscores, and GFP filenames may have extra parts.
+    """
+    # bg_gradient = background_picture_gradient(BACKGROUND)
+
+    all_files = os.listdir(folder_path)
+    All_ave_bact={}
+
+    for filename in all_files:
+        if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
+            try:
+                image_path = os.path.join(folder_path, filename)
+
+                # Try to extract prefix before "_GFP" or other suffix
+                prefix_match = re.match(r"(.+?)_(\d+)_GFP", filename)
+                dig = prefix_match.group(2)
+                prefix = prefix_match.group(1) if prefix_match else filename.split(GFP_FILE_INCLUDES)[0]
+                if len(dig) == 1:
+                    prefix = prefix + f"_{dig}"
+            except Exception as e:
+                print(f"Error in finding prefix {filename}: {e}")
+
+            # Search for a matching phase file
+            phase_file = None
+            for candidate in all_files:
+                if (candidate.startswith(prefix) and
+                        # re.search(r'phase', candidate, re.IGNORECASE) and
+                        not re.search(GFP_FILE_INCLUDES, candidate) and
+                        candidate.endswith(".tif")):
+                    phase_file = candidate
+                    break
+
+            if not phase_file:
+                print(f"[!] No matching phase file found for {filename} with prefix {prefix}")
+                continue
+
+            mask_path = os.path.join(folder_path, phase_file)
+            # exposure = get_exposure(filename)
+
+            try:
+                # x_value = extract_numeric_prefix(filename)
+                # print(x_value)
+                indices, labeled, aveMaskBacterium = bct.detect_each_bacteria(mask_path)
+                avebacterium = bct.compute_bacteria_intensities(image_path,indices)
+                # mean_val = mean_value_at_mask(image_path, mask_path, MaskType.BLACK, bg_gradient)
+                # background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
+                # print(mean_val, background_mean_val)
+                # if mean_val < background_mean_val:
+                #     print(f"[?] The background is lighter then the bacteria - file {filename}")
+                nbins=len(indices)//10
+                if len(indices)>1:
+                    All_ave_bact[filename] = avebacterium
+                    fig, (ax1,ax2) = plt.subplots(1,2)
+                    ax1.hist(avebacterium, bins=nbins)
+                    ax2.hist(np.log(avebacterium), bins=nbins)
+
+                    plt.title(f"Histogram for {filename}")
+                    plt.show()
+
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
+
+
+    return (All_ave_bact)
+
     # Sort by x-value (numeric prefix)
     results.sort(key=lambda x: x[0])
     # print(results)
@@ -362,13 +434,24 @@ if __name__ == "__main__":
     # plt.colorbar()
     # plt.show()
 
-    # extract_and_rename_images(f"{BASE_FOLDER}", f"{BASE_FOLDER}/{PICTURE_FOLDER}/{TMP_FOLDER}", exclude_subfolders)
+    #TODO add background reduction to process_gfp_TMG_images
+    # take all_ave_bacterium and make histogram for every sample (לאחד קבצים שונים של אותה דגימה)
+
+
+    # extract_and_rename_images(f"{BASE_FOLDER}/20250608", f"{BASE_FOLDER}/{PICTURE_FOLDER}/{TMP_FOLDER}", exclude_subfolders)
     # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")[!] analyzing 20250520_70_A_2_GFP_3000.tif...
-    # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{TMP_FOLDER}")
+    # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
 
     # process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
-    indices, labeled = bct.detect_each_bacteria(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250610_18_5_A_100_Phase_TMG_1_Default_100.tif")
-    print(f"Found {len(indices)} bacteria.")
+    all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    # indices, labeled, aveMaskBacterium = bct.detect_each_bacteria(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_1_TMG_1_Phase_100.tif")
+    # print(f"Found {len(indices)} bacteria.")
+    # avebacterium=bct.compute_bacteria_intensities(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_2_TMG_1_GFP_5000.tif",indices)
+    # plt.figure()
+    # plt.scatter(range(len(avebacterium)),avebacterium)
+    # plt.show()
+    # plt.hist(avebacterium, bins=50)
+    # plt.show()
 
 
     # print("First bacterium indices:", indices[0])
