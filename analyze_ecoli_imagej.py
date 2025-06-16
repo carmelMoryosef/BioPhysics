@@ -356,7 +356,7 @@ def process_gfp_TMG_images(folder_path: str):
     # pattern = r'mask_(?:_(\d+))?_(?:TMG|TMD)_(\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
     # pattern = r'(.+?)_(\d+_\d+)_[A-Z]_(?:TMG|TMD)_(?:\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
     pattern = r'(.+?)_(\d+_\d+)_[A-Z](?:_(?:\d+))?_(?:TMG|TMD)_(?:\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
-    exposure_pattern = r'mask_\d+_\d+_\d+_[A-Z]_\d+_GFP_TMG_Default_(\d+)'
+    bg_gradient = background_picture_gradient(BACKGROUND)
 
     for filename in all_files:
         if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
@@ -401,7 +401,7 @@ def process_gfp_TMG_images(folder_path: str):
                 # x_value = extract_numeric_prefix(filename)
                 # print(x_value)
                 indices, labeled, aveMaskBacterium = bct.detect_each_bacteria(mask_path)
-                avebacterium = bct.compute_bacteria_intensities(image_path,indices)
+                avebacterium = bct.compute_bacteria_intensities(image_path, indices, mask_path, bg_gradient)
                 # mean_val = mean_value_at_mask(image_path, mask_path, MaskType.BLACK, bg_gradient)
                 # background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
                 # print(mean_val, background_mean_val)
