@@ -20,12 +20,6 @@ import json
 import tifffile
 from consts import DARK_COUNT, BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER, PHASE_SUFFIX, MASK_PREFIX, GFP_FILE_INCLUDES, TMG_FOLDER, BACKGROUND
 
-# Initialize ImageJ once (reuse in both functions)
-ij = imagej.init('sc.fiji:fiji', headless=False)
-IJ = jimport('ij.IJ')
-Prefs = jimport('ij.Prefs')
-WM = jimport('ij.WindowManager')
-
 
 exclude_subfolders = ["20250518", "BackGround","trash_measurments","20250520","20250603"]
 
@@ -449,6 +443,12 @@ def process_gfp_TMG_images(folder_path: str):
 
 
 if __name__ == "__main__":
+    # Initialize ImageJ once (reuse in both functions)
+    ij = imagej.init('sc.fiji:fiji', headless=False)
+    IJ = jimport('ij.IJ')
+    Prefs = jimport('ij.Prefs')
+    WM = jimport('ij.WindowManager')
+
     #TODO shachar fix the folders so it can loop over all the dates folders
     # bg_mean = background_picture_gradient(BACKGROUND)
     # plt.imshow(bg_mean, cmap="gray")
