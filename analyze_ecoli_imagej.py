@@ -355,7 +355,7 @@ def process_gfp_TMG_images(folder_path: str):
     # pattern = r'mask_\d+_(\d+_\d+_[A-Z])_(\d+)_GFP'
     # pattern = r'mask_(?:_(\d+))?_(?:TMG|TMD)_(\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
     # pattern = r'(.+?)_(\d+_\d+)_[A-Z]_(?:TMG|TMD)_(?:\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
-    pattern = r'(.+?)_(\d+_\d+)_[A-Z](?:_(?:\d+))?_(?:TMG|TMD)_(?:\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
+    pattern = r'(.+?)_(\d+_\d+)_[A-Z](?:_(?:\d+))?_(?:TMG|TMD|GFP)(?:_\d+)?_(?:GFP|TMG)_(?:_(\d+))?(?:.+)?(3000|5000|800|100)'
     bg_gradient = background_picture_gradient(BACKGROUND)
 
     for filename in all_files:
@@ -366,7 +366,7 @@ def process_gfp_TMG_images(folder_path: str):
                 match = re.search(pattern, filename)
                 inducer = underscore_to_point(match.group(2))
                 exposure = match.group(4)
-                        
+
                 # Try to extract prefix before "_GFP" or other suffix
                 #(.+?)_(\d+)_(?:TMG|TMD)_(\d+)_GFP
                 prefix_match = re.match(r"(.+?)_(\d+)_GFP", filename)
