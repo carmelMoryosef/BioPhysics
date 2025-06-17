@@ -364,9 +364,8 @@ def process_gfp_TMG_images(folder_path: str):
                 image_path = os.path.join(folder_path, filename)
                 
                 match = re.search(pattern, filename)
-                if match:
-                    inducer = underscore_to_point(match.group(2))
-                    exposure = match.group(4)
+                inducer = underscore_to_point(match.group(2))
+                exposure = match.group(4)
                         
                 # Try to extract prefix before "_GFP" or other suffix
                 #(.+?)_(\d+)_(?:TMG|TMD)_(\d+)_GFP
@@ -463,10 +462,6 @@ if __name__ == "__main__":
     # plt.title("Mean Background Image")
     # plt.colorbar()
     # plt.show()
-
-    #TODO add background reduction to process_gfp_TMG_images
-    # take all_ave_bacterium and make histogram for every sample (לאחד קבצים שונים של אותה דגימה)
-
 
     # extract_and_rename_images(f"{BASE_FOLDER}/20250608", f"{BASE_FOLDER}/{PICTURE_FOLDER}/{TMG_FOLDER}", exclude_subfolders)
     # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")[!] analyzing 20250520_70_A_2_GFP_3000.tif...
