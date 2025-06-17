@@ -3,7 +3,7 @@ import json
 import tifffile
 from ome_types import from_tiff
 from ome_types.model import OME, Image, Plane
-from analyze_ecoli_imagej import BASE_FOLDER
+from consts import BASE_FOLDER
 
 
 # --- Part 1: Helper functions for ome_to_metadata ---

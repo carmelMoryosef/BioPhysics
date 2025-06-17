@@ -1,0 +1,11 @@
+# BASE_FOLDER = r"G:/My Drive/bio_physics"
+# BASE_FOLDER=r"G:\My Drive\bio_physics\CarmelShachar (1)"
+DARK_COUNT= 103.739
+BASE_FOLDER = r".\data\basic_experiment\\"
+PICTURE_FOLDER = "pictures"
+MASKS_FOLDER = "masks"
+PHASE_SUFFIX = "Phase_100.tif"
+MASK_PREFIX = "mask"
+GFP_FILE_INCLUDES = "GFP"
+TMG_FOLDER = "TMG"
+BACKGROUND = r'BackGround\20250527' #background folder

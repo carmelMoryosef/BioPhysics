@@ -60,8 +60,6 @@ def detect_each_bacteria(image_path, show_plot=False):
 
     return bacteria_indices, labeled_image, avg_intensities
 
-import numpy as np
-
 def compute_bacteria_intensities(image_path, bacteria_indices, mask_path, bg_gradient):
     """
     Computes average grayscale intensity for each bacterium in the given image.
