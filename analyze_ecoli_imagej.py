@@ -324,6 +324,12 @@ def underscore_to_point(s: str) -> str:
     return float(s.replace('_', '.')
 )
 
+def point_to_underscore(s: str) -> str:
+    """
+    Converts periods in a string back to underscores.
+    """
+    return str(s).replace('.', '_')
+
 #TODO remove code duplications
 def process_gfp_TMG_images(folder_path: str):
     """
@@ -412,7 +418,8 @@ def process_gfp_TMG_images(folder_path: str):
         ax2.hist(np.log(values), bins=nbins)
         ax2.set_title(f"Log-Distribution for {inducer}, Exposure {exposure}")
         plt.tight_layout()
-        plt.show()
+        plt.savefig(f"./figures/hist_{point_to_underscore(inducer)}_{exposure}.png")
+        # plt.show()
 
 
 
