@@ -18,10 +18,14 @@ import analyze_bacterium as bct
 import os
 import json
 import tifffile
-from consts import DARK_COUNT, BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER, PHASE_SUFFIX, MASK_PREFIX, GFP_FILE_INCLUDES, TMG_FOLDER, BACKGROUND
+from scipy.optimize import curve_fit
+from consts import DARK_COUNT, BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER, PHASE_SUFFIX, MASK_PREFIX, GFP_FILE_INCLUDES, TMG_FOLDER, BACKGROUND,N,Threshold
+
+def model(x, D, R, C, n,Y0,X0):
+    return D / (R * (1 / (C * (x-X0)**n + 1)) + 1)
 
 
-exclude_subfolders = ["20250518", "BackGround","trash_measurments","20250520","20250603"]
+exclude_subfolders = ["BackGround","trash_measurments","CarmelShachar (1)","CarmelShachar","20250518"]
 
 def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     """
@@ -54,16 +58,16 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     IJ.run(imp, "Enhance Contrast", "saturated=0.35")
     IJ.run(imp, "Apply LUT", "")
     IJ.run("Close")
-    
+
     imp.setAutoThreshold("Default dark no-reset")
     IJ.setRawThreshold(imp, 0, 65535)
     IJ.setRawThreshold(imp, 0, 65535)
-    IJ.setRawThreshold(imp, 0, 200)
-    IJ.setRawThreshold(imp, 0, 200)
+    IJ.setRawThreshold(imp, 0, Threshold)
+    IJ.setRawThreshold(imp, 0, Threshold)
 
     Prefs.blackBackground = True
     IJ.run(imp, "Convert to Mask", "")
-    IJ.run(imp, "Analyze Particles...", "size=30-110 show=Masks exclude clear summarize overlay")
+    IJ.run(imp, "Analyze Particles...", "size=40-170 circularity=0.50-1 show=Masks exclude clear summarize overlay")
     # IJ.saveAs("Results", res_path)
     mask_imp = IJ.getImage()
     imp.changes = False
@@ -309,13 +313,89 @@ def process_gfp_images(folder_path: str):
                 # print(mean_val, background_mean_val)
                 if mean_val < background_mean_val:
                     print(f"[?] The background is lighter then the bacteria - file {filename}")
-                results.append((x_value, (mean_val-background_mean_val)*100, background_mean_val, exposure))# i added background simple value
+                results.append((x_value, (mean_val-background_mean_val)*N, background_mean_val, exposure))# i added background simple value
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
 
     if not results:
         print("[!] No valid results to plot.")
         return
+        # Sort by x-value (numeric prefix)
+    results.sort(key=lambda x: x[0])
+    # print(results)
+    x_vals, y_vals, background_mean_val, exposure_vals = zip(*results)
+
+    # Convert to numpy arrays for indexing
+    x_vals = np.array(x_vals)
+    y_vals = np.array(y_vals)
+    exposure_vals = np.array(exposure_vals)
+
+    # Color map settings
+    cmap = plt.cm.rainbow
+    norm = mpl.colors.Normalize(vmin=min(exposure_vals), vmax=max(exposure_vals))
+
+    # Unique exposures
+    unique_exposures = np.unique(exposure_vals)
+
+    # Plot all fits
+    plt.figure(figsize=(8, 5))
+
+    for exp in unique_exposures:
+        # Select data for this exposure
+        mask = exposure_vals == exp
+        x_exp = x_vals[mask]
+        y_exp = y_vals[mask]
+
+        # Fit
+        initial_guess = [7, 100, 0.5, 2, 0,1]  # D, R, C, n, Y0
+        lower_bounds = [0, 0, 0, 0, -1000,-1000]  # R >= 0 enforced here
+        upper_bounds = [np.inf] * 6
+
+        try:
+            params, covariance = curve_fit(
+            model, x_exp, y_exp,
+            p0=initial_guess,
+            bounds=(lower_bounds, upper_bounds),
+            maxfev=10000)
+        except RuntimeError:
+            print(f"Fit failed for exposure {exp}")
+            continue
+
+            # Unpack parameters and errors
+        D_fit, R_fit, C_fit, n_fit, Y0_fit, X0_fit= params
+        uncertainties = np.sqrt(np.diag(covariance))
+
+        # Format label with ± uncertainties
+        label = (f'Exp {exp} | D={D_fit:.1f}, '
+                 f'R={R_fit:.1f}'
+                 f'C={C_fit:.4f}'
+                 f'n={n_fit:.1f}'
+                 f'X₀={X0_fit:.2f}')
+
+        # Plot
+        color = cmap(norm(exp))
+        plt.scatter(x_exp, y_exp, color=color)
+
+        x_fit = np.linspace(min(x_exp), max(x_exp), 500)
+        y_fit = model(x_fit, *params)
+        plt.plot(x_fit, y_fit, color=color, label=label)
+    # plt.plot(x_fit, y_fit, color='b', label='Fit')
+    plt.legend()
+
+    # plt.scatter(x_vals, background_mean_val, marker="*", color=cmap(norm(exposure_vals)))
+    # add y line at avrage of background_mean_val
+    # plt.plot([min(x_vals), max(x_vals)],[np.mean(background_mean_val),np.mean(background_mean_val)], color=cmap(norm(exposure_vals)))
+    # plt.ylim((0,1100))
+    # plt.scatter(x_vals, BG_vals, marker='*')#mean background
+    plt.xlabel("Inducer")
+    plt.ylabel("Mean value in non-black mask region")
+    plt.title("Mean GFP Intensity over Time/Image Index")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f"./figures/fit_N{N}_threshold{Threshold}_TMG.png")
+    plt.show()
+    # plt.savefig(f"./figures/fit_{N}_threshold{Threshold}.png")
+
 
 def underscore_to_point(s: str) -> str:
     """
@@ -356,6 +436,7 @@ def process_gfp_TMG_images(folder_path: str):
         if GFP_FILE_INCLUDES in filename and filename.endswith(".tif"):
             try:
                 image_path = os.path.join(folder_path, filename)
+                print("im still working")
                 
                 match = re.search(pattern, filename)
                 inducer = underscore_to_point(match.group(2))
@@ -426,28 +507,6 @@ def process_gfp_TMG_images(folder_path: str):
 
     return (All_ave_bact)
 
-    # Sort by x-value (numeric prefix)
-    results.sort(key=lambda x: x[0])
-    # print(results)
-    x_vals, y_vals, background_mean_val, exposure_vals = zip(*results)
-
-    cmap = plt.cm.rainbow
-    norm = mpl.colors.Normalize(vmin=min(exposure_vals), vmax=max(exposure_vals))
-
-    # Plot
-    plt.figure(figsize=(8, 5))
-    plt.scatter(x_vals, y_vals, color=cmap(norm(exposure_vals)))
-    # plt.scatter(x_vals, background_mean_val, marker="*", color=cmap(norm(exposure_vals)))
-    # add y line at avrage of background_mean_val
-    # plt.plot([min(x_vals), max(x_vals)],[np.mean(background_mean_val),np.mean(background_mean_val)], color=cmap(norm(exposure_vals)))
-    # plt.ylim((0,1100))
-    # plt.scatter(x_vals, BG_vals, marker='*')#mean background
-    plt.xlabel("Inducer")
-    plt.ylabel("Mean value in non-black mask region")
-    plt.title("Mean GFP Intensity over Time/Image Index")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
 
 
 if __name__ == "__main__":
@@ -466,10 +525,10 @@ if __name__ == "__main__":
 
     # extract_and_rename_images(f"{BASE_FOLDER}", f"{BASE_FOLDER}/{PICTURE_FOLDER}", exclude_subfolders)
     # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")[!] analyzing 20250520_70_A_2_GFP_3000.tif...
-    # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
+    analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
 
-    # process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
-    all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    # all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
     # indices, labeled, aveMaskBacterium = bct.detect_each_bacteria(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_1_TMG_1_Phase_100.tif")
     # print(f"Found {len(indices)} bacteria.")
     # avebacterium=bct.compute_bacteria_intensities(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_2_TMG_1_GFP_5000.tif",indices)
