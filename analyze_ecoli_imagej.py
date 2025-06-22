@@ -210,7 +210,11 @@ def background_adjustments(image, bg_picture):
     # dark count subtract
     # dividing by mean BG picture
     image = image - DARK_COUNT
+    if np.any(image < 0):
+        print("negative after Dark count")
     image_withnoBG = image / bg_picture
+    if np.any(image_withnoBG < 0):
+        print("negative after division")
     # plt.imshow(image_withnoBG, cmap="gray")
     return image_withnoBG
 
@@ -312,7 +316,7 @@ def process_gfp_images(folder_path: str):
                 background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
                 # print(mean_val, background_mean_val)
                 if mean_val < background_mean_val:
-                    print(f"[?] The background is lighter then the bacteria - file {filename} diff:{background_mean_val-mean_val}")
+                    print(f"[?] The background is lighter then the bacteria - file {filename}, diff: {background_mean_val - mean_val}")
                 results.append((x_value, (mean_val-background_mean_val)*N, background_mean_val, exposure))# i added background simple value
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
@@ -424,7 +428,7 @@ def process_gfp_TMG_images(folder_path: str):
     # bg_gradient = background_picture_gradient(BACKGROUND)
 
     all_files = os.listdir(folder_path)
-    All_ave_bact={}
+    all_ave_bact={}
     # pattern = r'mask_\d+_(\d+_\d+_[A-Z])_(\d+)_GFP'
     # pattern = r'mask_(?:_(\d+))?_(?:TMG|TMD)_(\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
     # pattern = r'(.+?)_(\d+_\d+)_[A-Z]_(?:TMG|TMD)_(?:\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
@@ -483,15 +487,15 @@ def process_gfp_TMG_images(folder_path: str):
                 #     print(f"[?] The background is lighter then the bacteria - file {filename}")
                 nbins=len(indices)//10
                 if len(indices)>1:
-                    if (inducer, exposure) in All_ave_bact:
+                    if (inducer, exposure) in all_ave_bact:
                         #TODO carmel, like this? 
-                        All_ave_bact[(inducer, exposure)].extend(avebacterium)
+                        all_ave_bact[(inducer, exposure)].extend(avebacterium)
                     else:
-                        All_ave_bact[(inducer, exposure)] = avebacterium
+                        all_ave_bact[(inducer, exposure)] = avebacterium
             except Exception as e:
                 print(f"Error processing TMG {filename}: {e}")
                 
-    for (inducer, exposure), values in All_ave_bact.items():
+    for (inducer, exposure), values in all_ave_bact.items():
         nbins = max(10, len(values) // 10)
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
@@ -505,7 +509,7 @@ def process_gfp_TMG_images(folder_path: str):
 
 
 
-    return (All_ave_bact)
+    return (all_ave_bact)
 
 
 
@@ -543,7 +547,11 @@ if __name__ == "__main__":
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\210_B_3_GFP_3000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\masks\mask_140_B_3_GFP_5000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
 
-    # show_image(f"data/basic_experiment/pictures/masks/mask_210_B_1_Phase_100.tif")
+    # show_image(f"data/basic_experiment/pictures/TMG/masks/mask_20250610_9_3_B_5000_GFP_TMG_Default_5000.tif")
+    # show_image(f"data/basic_experiment/pictures/20250608/9_3_B_TMD_1/Default/img_channel000_position000_time000000000_z000.tif")
+    # show_image(f"data/basic_experiment/pictures/TMG/masks/mask_20250610_20_9_A_3000_GFP_TMG_Default_3000.tif")
+    # show_image(f"data/basic_experiment/pictures/TMG/masks/mask_20250610_20_9_A_100_Phase_TMG_1_Default_100.tif")
+    # process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, TMG_FOLDER, MASKS_FOLDER))
     # show_image(r"G:\My Drive\bio_physics\pictures\masks\\mask_35_A_3_GFP_5000.tif")
 
     # # --- IMPORTANT ---
