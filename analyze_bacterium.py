@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage import io, measure, morphology
 from skimage.color import label2rgb
-from analyze_ecoli_imagej import mean_value_at_mask
+from analyze_ecoli_imagej import mean_value_at_mask, background_adjustments
 from mask_enum import MaskType
 
 def detect_each_bacteria(image_path, show_plot=False):
@@ -78,6 +78,7 @@ def compute_bacteria_intensities(image_path, bacteria_indices, mask_path, bg_gra
     avg_intensities = []
     for flat_index_list in bacteria_indices:
         coords = np.unravel_index(flat_index_list, shape)
+        image= background_adjustments(image, bg_gradient)
         intensity_values = image[coords]
         background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
         avg_intensities.append(np.mean(intensity_values) - background_mean_val)

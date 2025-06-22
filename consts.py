@@ -1,5 +1,5 @@
-BASE_FOLDER = r"G:/My Drive/bio_physics"
-# BASE_FOLDER=r"G:\My Drive\bio_physics\CarmelShachar (1)"
+# BASE_FOLDER = r"G:/My Drive/bio_physics"
+BASE_FOLDER=r"G:\My Drive\bio_physics\CarmelShachar (1)"
 DARK_COUNT= 103.739
 N=100
 Threshold=15000

@@ -312,7 +312,7 @@ def process_gfp_images(folder_path: str):
                 background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
                 # print(mean_val, background_mean_val)
                 if mean_val < background_mean_val:
-                    print(f"[?] The background is lighter then the bacteria - file {filename}")
+                    print(f"[?] The background is lighter then the bacteria - file {filename} diff:{background_mean_val-mean_val}")
                 results.append((x_value, (mean_val-background_mean_val)*N, background_mean_val, exposure))# i added background simple value
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
