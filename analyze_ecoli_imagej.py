@@ -352,29 +352,30 @@ def process_gfp_images(folder_path: str):
 
         # Fit
         initial_guess = [7, 100, 0.5, 2, 0,1]  # D, R, C, n, Y0
-        lower_bounds = [0, 0, 0, 0, -1000,-1000]  # R >= 0 enforced here
-        upper_bounds = [np.inf] * 6
+        lower_bounds = [0, 0, 0, 1, -1000,-1000]  # R >= 0 enforced here
+        upper_bounds = [np.inf] * 3 + [4,np.inf,np.min(x_exp)]
 
         try:
-            params, covariance = curve_fit(
+            params, cov = curve_fit(
             model, x_exp, y_exp,
             p0=initial_guess,
             bounds=(lower_bounds, upper_bounds),
             maxfev=10000)
-        except RuntimeError:
-            print(f"Fit failed for exposure {exp}")
-            continue
 
             # Unpack parameters and errors
-        D_fit, R_fit, C_fit, n_fit, Y0_fit, X0_fit= params
-        uncertainties = np.sqrt(np.diag(covariance))
+            D_fit, R_fit, C_fit, n_fit, Y0_fit, X0_fit= params
 
-        # Format label with ± uncertainties
-        label = (f'Exp {exp} | D={D_fit:.1f}, '
-                 f'R={R_fit:.1f}'
-                 f'C={C_fit:.4f}'
-                 f'n={n_fit:.1f}'
-                 f'X₀={X0_fit:.2f}')
+            # Format label with ± uncertainties
+            label = (f'Exp {exp} | D={D_fit:.1f}, '
+                     f'R={R_fit:.1f}'
+                     f'C={C_fit:.4f}'
+                     f'n={n_fit:.1f}'
+                     f'X₀={X0_fit:.2f}')
+
+            # uncertainties = np.sqrt(np.diag(covariance))
+        except RuntimeError:
+            print(f"Fit failed for exposure {exp} param= {params}")
+            continue
 
         # Plot
         color = cmap(norm(exp))
