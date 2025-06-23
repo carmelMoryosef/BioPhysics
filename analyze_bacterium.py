@@ -179,7 +179,7 @@ def compute_bacteria_intensities(image_path, bacteria_indices, mask_path, bg_gra
         coords = np.unravel_index(flat_index_list, shape)
         intensity_values = image[coords]
         background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
-        avg_intens = np.max(np.mean(intensity_values) - background_mean_val, 0)
+        avg_intens = np.maximum(np.mean(intensity_values) - background_mean_val, 0)
         avg_intensities.append(avg_intens)
 
     return avg_intensities
