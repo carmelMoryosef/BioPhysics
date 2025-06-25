@@ -212,7 +212,7 @@ def background_adjustments(image, bg_picture):
     image = image - DARK_COUNT
     if np.any(image < 0):
         print("negative after Dark count")
-    image_withnoBG = image / bg_picture
+    image_withnoBG = image / (bg_picture/10)
     if np.any(image_withnoBG < 0):
         print("negative after division")
     # plt.imshow(image_withnoBG, cmap="gray")
@@ -486,7 +486,6 @@ def process_gfp_TMG_images(folder_path: str):
                 # print(mean_val, background_mean_val)
                 # if mean_val < background_mean_val:
                 #     print(f"[?] The background is lighter then the bacteria - file {filename}")
-                nbins=len(indices)//10
                 if len(indices)>1:
                     if (inducer, exposure) in all_ave_bact:
                         #TODO carmel, like this? 
@@ -505,7 +504,7 @@ def process_gfp_TMG_images(folder_path: str):
         ax2.hist(np.log(values), bins=nbins)
         ax2.set_title(f"Log-Distribution for {inducer}, Exposure {exposure}")
         plt.tight_layout()
-        plt.savefig(f"./figures/hist_{point_to_underscore(inducer)}_{exposure}.png")
+        plt.savefig(f"./figures/hist_IPTG_{point_to_underscore(inducer)}_{exposure}_noMeanVal.png")
         # plt.show()
 
 
