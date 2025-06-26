@@ -18,12 +18,14 @@ import analyze_bacterium as bct
 import os
 import json
 import tifffile
+from collections import defaultdict
 from scipy.optimize import curve_fit
 from consts import DARK_COUNT, BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER, PHASE_SUFFIX, MASK_PREFIX, GFP_FILE_INCLUDES, TMG_FOLDER, BACKGROUND,N,Threshold
 
 def model(x, D, R, C, n,Y0,X0):
-    return D / (R * (1 / (C * (x-X0)**n + 1)) + 1)
-
+    return D / (R * (1 / (C * (x)**n + 1)) + 1)+Y0
+def HillEq(x,Kd,n):
+    return (x**n)/(Kd**n+x**n)
 
 exclude_subfolders = ["BackGround","trash_measurments","CarmelShachar (1)","CarmelShachar","20250518"]
 
@@ -67,7 +69,7 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
 
     Prefs.blackBackground = True
     IJ.run(imp, "Convert to Mask", "")
-    IJ.run(imp, "Analyze Particles...", "size=40-170 circularity=0.50-1 show=Masks exclude clear summarize overlay")
+    IJ.run(imp, "Analyze Particles...", "size=30-170 circularity=0.50-1 show=Masks exclude clear summarize overlay")
     # IJ.saveAs("Results", res_path)
     mask_imp = IJ.getImage()
     imp.changes = False
@@ -317,7 +319,7 @@ def process_gfp_images(folder_path: str):
                 # print(mean_val, background_mean_val)
                 if mean_val < background_mean_val:
                     print(f"[?] The background is lighter then the bacteria - file {filename}, diff: {background_mean_val - mean_val}")
-                results.append((x_value, (mean_val-background_mean_val)*N, background_mean_val, exposure))# i added background simple value
+                results.append((x_value, (abs((mean_val)-background_mean_val))*N, background_mean_val, exposure))# i added background simple value
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
 
@@ -349,42 +351,76 @@ def process_gfp_images(folder_path: str):
         mask = exposure_vals == exp
         x_exp = x_vals[mask]
         y_exp = y_vals[mask]
+        # Group y values by x
+        x_to_ys = defaultdict(list)
+        for x_val, y_val in zip(x_exp, y_exp):
+            x_to_ys[x_val].append(y_val)
 
+        # Compute average y for each unique x
+        x_avg = []
+        y_avg = []
+        for x_val in sorted(x_to_ys.keys()):
+            ys = x_to_ys[x_val]
+            x_avg.append(x_val)
+            y_avg.append(np.mean(ys))
+
+        # Convert to numpy arrays for fitting
+        x_exp = np.array(x_avg)
+        y_exp = np.array(y_avg)
+        y_exp_60 = y_exp[(x_exp <= 50) | (x_exp>=70)]
+        x_exp_60 = x_exp[(x_exp<=50) | (x_exp>=70)]
+        #try to do somthing for hill coefficient
+        R=(y_exp-y_exp[x_exp.argmin()])/(y_exp[y_exp.argmax()]-y_exp[x_exp.argmin()]) #y_exp[x_exp.argmin()]
         # Fit
         initial_guess = [7, 100, 0.5, 2, 0,1]  # D, R, C, n, Y0
         lower_bounds = [0, 0, 0, 1, -1000,-1000]  # R >= 0 enforced here
         upper_bounds = [np.inf] * 3 + [4,np.inf,np.min(x_exp)]
-
+        initial_guess_hill = [1,6]  # Kd,n
+        lower_bounds_hill= [0,0.9]  # R >= 0 enforced here
+        upper_bounds_hill= [np.inf,9]
         try:
             params, cov = curve_fit(
-            model, x_exp, y_exp,
+            model, x_exp_60, y_exp_60,
             p0=initial_guess,
             bounds=(lower_bounds, upper_bounds),
             maxfev=10000)
+            params_hill, cov_hill = curve_fit(
+            HillEq, x_exp, R,
+            p0=initial_guess_hill,
+            bounds=(lower_bounds_hill, upper_bounds_hill),
+            maxfev=100000)
 
             # Unpack parameters and errors
             D_fit, R_fit, C_fit, n_fit, Y0_fit, X0_fit= params
-
+            Kd_hillfit, n_hillfit=params_hill
             # Format label with ± uncertainties
-            label = (f'Exp {exp} | D={D_fit:.1f}, '
-                     f'R={R_fit:.1f}'
-                     f'C={C_fit:.4f}'
-                     f'n={n_fit:.1f}'
-                     f'X₀={X0_fit:.2f}')
+            label = (f'Exp {exp} | Kd={Kd_hillfit:.1f}, '
+                                        f'n={n_hillfit:.2f}')
+            # label = (f'Exp {exp} | D={D_fit:.1f}, '
+            #          f'R={R_fit:.1f}'
+            #          f'C={C_fit:.4f}'
+            #          f'n={n_fit:.1f}'
+            #          f'X₀={Y0_fit:.2f}')
 
             # uncertainties = np.sqrt(np.diag(covariance))
         except RuntimeError:
-            print(f"Fit failed for exposure {exp} param= {params}")
+            print(f"Fit failed for exposure {exp} param= {params_hill}")
             continue
 
         # Plot
         color = cmap(norm(exp))
-        plt.scatter(x_exp, y_exp, color=color)
+        # plt.scatter(x_exp, y_exp, color=color)
+        plt.scatter(x_exp, R, color=color)
 
         x_fit = np.linspace(min(x_exp), max(x_exp), 500)
         y_fit = model(x_fit, *params)
-        plt.plot(x_fit, y_fit, color=color, label=label)
+        x_hill = np.linspace(min(x_exp), max(x_exp), 500)
+        R_hill = HillEq(x_hill, *params_hill)
+        # plt.axvline(Kd_hillfit, color=color)
+        # plt.plot(x_fit, y_fit, color=color, label=label)
+        plt.plot(x_hill, R_hill, color=color, label=label)
     # plt.plot(x_fit, y_fit, color='b', label='Fit')
+    # plt.axhline(0.5,color="black")
     plt.legend()
 
     # plt.scatter(x_vals, background_mean_val, marker="*", color=cmap(norm(exposure_vals)))
@@ -394,10 +430,11 @@ def process_gfp_images(folder_path: str):
     # plt.scatter(x_vals, BG_vals, marker='*')#mean background
     plt.xlabel("Inducer")
     plt.ylabel("Mean value in non-black mask region")
+    plt.ylabel("R")
     plt.title("Mean GFP Intensity over Time/Image Index")
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f"./figures/fit_N{N}_threshold{Threshold}_TMG.png")
+    plt.savefig(f"./figures/hillco_fit_N{N}_threshold{Threshold}_TMG_BGsubstraction_no10_06_xmin.png")
     plt.show()
     # plt.savefig(f"./figures/fit_{N}_threshold{Threshold}.png")
 
@@ -504,7 +541,7 @@ def process_gfp_TMG_images(folder_path: str):
         ax2.hist(np.log(values), bins=nbins)
         ax2.set_title(f"Log-Distribution for {inducer}, Exposure {exposure}")
         plt.tight_layout()
-        plt.savefig(f"./figures/hist_IPTG_{point_to_underscore(inducer)}_{exposure}_noMeanVal.png")
+        plt.savefig(f"./figures/hist_TMG_{point_to_underscore(inducer)}_{exposure}_noBGmenipolation.png")
         # plt.show()
 
 
