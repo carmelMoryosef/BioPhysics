@@ -20,12 +20,10 @@ import json
 import tifffile
 from collections import defaultdict
 from scipy.optimize import curve_fit
+from plot_process_avg import plot_multiple_res_dicts_grouped
+from fit_functions import model, hillEq
 from consts import DARK_COUNT, BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER, PHASE_SUFFIX, MASK_PREFIX, GFP_FILE_INCLUDES, TMG_FOLDER, BACKGROUND,N,Threshold
 
-def model(x, D, R, C, n,Y0,X0):
-    return D / (R * (1 / (C * (x)**n + 1)) + 1)+Y0
-def HillEq(x,Kd,n):
-    return (x**n)/(Kd**n+x**n)
 
 exclude_subfolders = ["BackGround","trash_measurments","CarmelShachar (1)","CarmelShachar","20250518"]
 
@@ -345,6 +343,8 @@ def process_gfp_images(folder_path: str):
 
     # Plot all fits
     plt.figure(figsize=(8, 5))
+    
+    res_dict = dict()
 
     for exp in unique_exposures:
         # Select data for this exposure
@@ -369,6 +369,8 @@ def process_gfp_images(folder_path: str):
         y_exp = np.array(y_avg)
         y_exp_60 = y_exp[(x_exp <= 50) | (x_exp>=70)]
         x_exp_60 = x_exp[(x_exp<=50) | (x_exp>=70)]
+        
+        res_dict[exp] = dict(x=x_exp_60, y=y_exp_60)
         #try to do somthing for hill coefficient
         R=(y_exp-y_exp[x_exp.argmin()])/(y_exp[y_exp.argmax()]-y_exp[x_exp.argmin()]) #y_exp[x_exp.argmin()]
         # Fit
@@ -385,7 +387,7 @@ def process_gfp_images(folder_path: str):
             bounds=(lower_bounds, upper_bounds),
             maxfev=10000)
             params_hill, cov_hill = curve_fit(
-            HillEq, x_exp, R,
+            hillEq, x_exp, R,
             p0=initial_guess_hill,
             bounds=(lower_bounds_hill, upper_bounds_hill),
             maxfev=100000)
@@ -415,7 +417,7 @@ def process_gfp_images(folder_path: str):
         x_fit = np.linspace(min(x_exp), max(x_exp), 500)
         y_fit = model(x_fit, *params)
         x_hill = np.linspace(min(x_exp), max(x_exp), 500)
-        R_hill = HillEq(x_hill, *params_hill)
+        R_hill = hillEq(x_hill, *params_hill)
         # plt.axvline(Kd_hillfit, color=color)
         # plt.plot(x_fit, y_fit, color=color, label=label)
         plt.plot(x_hill, R_hill, color=color, label=label)
@@ -435,8 +437,9 @@ def process_gfp_images(folder_path: str):
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(f"./figures/hillco_fit_N{N}_threshold{Threshold}_TMG_BGsubstraction_no10_06_xmin.png")
-    plt.show()
+    # plt.show()
     # plt.savefig(f"./figures/fit_{N}_threshold{Threshold}.png")
+    return res_dict
 
 
 def underscore_to_point(s: str) -> str:
@@ -569,7 +572,17 @@ if __name__ == "__main__":
     # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
     #
     # process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
-    all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    
+    
+    res_iptg = process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    res_tmg = process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, TMG_FOLDER, MASKS_FOLDER))
+
+    # Or with custom labels:
+    labels = ["IPTG", "TMG"]
+    res_dict_list = [res_iptg, res_tmg]
+    plot_multiple_res_dicts_grouped(res_dict_list, labels=labels, save_path="./figures/grouped_comparison.png")
+    
+    # all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
     # indices, labeled, aveMaskBacterium = bct.detect_each_bacteria(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_1_TMG_1_Phase_100.tif")
     # print(f"Found {len(indices)} bacteria.")
     # avebacterium=bct.compute_bacteria_intensities(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_2_TMG_1_GFP_5000.tif",indices)
