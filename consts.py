@@ -1,12 +1,12 @@
-# BASE_FOLDER = r"G:/My Drive/bio_physics"
-BASE_FOLDER=r"G:\My Drive\bio_physics\CarmelShachar (1)"
+BASE_FOLDER = r"G:/My Drive/bio_physics"
+# BASE_FOLDER=r"G:\My Drive\bio_physics\CarmelShachar (1)"
 BASE_FOLDER_IPTG = r"G:/My Drive/bio_physics"
 BASE_FOLDER_TMG=r"G:\My Drive\bio_physics\CarmelShachar (1)"
 DARK_COUNT= 103.739
 N=10
 Threshold=2000
-# Ind="IPTG"
-Ind="TMG"
+Ind="IPTG"
+# Ind="TMG"
 # BASE_FOLDER = r".\data\basic_experiment\\"
 PICTURE_FOLDER = "pictures"
 MASKS_FOLDER = f"{Threshold}_masks"#"New folder"

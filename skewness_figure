@@ -1,0 +1,88 @@
+import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
+
+# Replace with your actual data
+IPTG_concentration = [7.0, 11.6, 15.6, 23.0, 26.3, 35.0, 52.5, 70.0, 93.3, 140.0, 210.0]
+
+IPTG_skew_3000 = [2.11407, -0.48665, -0.19509, -0.04952, 0.07622, -0.94521, -0.26132, -0.65636, -0.63513, -0.49042, -0.43165]
+
+IPTG_skew_5000 = [1.86381, -0.57200, -0.20004, -0.02927, 0.08885, -0.85775, -1.00501, -0.46918, -0.67626, -0.37462, -0.45474]
+
+TMG_concentration = [2.3, 9.3, 18.5, 31.3, 55.6, 62.5, 111.0]
+
+TMG_skew_3000 = [1.828901104, 1.25619138, 0.6201, 0.3548, 0.558900541, 0.4468, 0.2963]
+
+TMG_skew_5000 = [3.863348127, 1.1779, 0.5224, 0.344372203, 0.566315798, 0.4399, 0.2689]
+
+
+# Settings
+markers = ['circle', 'star']
+colors = px.colors.qualitative.Set1
+
+fig = go.Figure()
+
+# IPTG
+fig.add_trace(go.Scatter(
+    x=IPTG_concentration,
+    y=IPTG_skew_3000,
+    mode='markers+lines',
+    marker=dict(symbol=markers[0], size=10, color=colors[0]),
+    name=r"$IPTG - Exposure\ 3000$",
+    legendgroup="IPTG"
+))
+
+fig.add_trace(go.Scatter(
+    x=IPTG_concentration,
+    y=IPTG_skew_5000,
+    mode='markers+lines',
+    marker=dict(symbol=markers[1], size=10, color=colors[0]),
+    name=r"$IPTG - Exposure\ 5000$",
+    legendgroup="iptg"
+))
+
+# TMG
+fig.add_trace(go.Scatter(
+    x=TMG_concentration,
+    y=TMG_skew_3000,
+    mode='markers+lines',
+    marker=dict(symbol=markers[0], size=10, color=colors[1]),
+    name=r"$TMG - Exposure\ 3000$",
+    legendgroup="TMG"
+))
+
+fig.add_trace(go.Scatter(
+    x=TMG_concentration,
+    y=TMG_skew_5000,
+    mode='markers+lines',
+    marker=dict(symbol=markers[1], size=10, color=colors[1]),
+    name=r"$TMG - Exposure\ 5000$",
+    legendgroup="tmg"
+))
+
+fig.update_layout(
+    title=r"$Skewness\ vs.\ Inducer\ Concentration$",
+    xaxis=dict(
+        title=r"$Inducer\ Concentration\ [\mu M]$",
+        title_font=dict(size=24),
+        showgrid=True,
+        gridcolor='lightgray'
+    ),
+    yaxis=dict(
+        title=r"$Skewness$",
+        title_font=dict(size=24),
+        showgrid=True,
+        gridcolor='lightgray'
+    ),
+    legend=dict(
+        x=0.7,
+        y=0.05,
+        font=dict(size=14)
+    ),
+    width=1000,
+    height=600,
+    template='plotly_white'
+)
+
+fig.write_html("./figures/skewness_vs_concentration.html", include_mathjax='cdn')
+fig.show()

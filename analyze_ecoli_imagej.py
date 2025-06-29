@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import tifffile
 import pandas as pd
+import re
+import plotly.graph_objs as go
+from scipy.stats import skew, kurtosis, skewnorm
 from matplotlib.pyplot import legend
 from requests import delete
 from skimage.io import imread
@@ -550,12 +553,14 @@ def process_gfp_TMG_images(folder_path: str):
                 print(f"Error processing TMG {filename}: {e}")
     data_summary = []
     for (inducer, exposure), values in all_ave_bact.items():
-        nbins = max(10, len(values) // 10)
+        nbins = max(15, len(values) // 10)
+        print(nbins)
         log_values = np.log(values)
         mean_val = np.mean(log_values)
         std_val = np.std(log_values)
         skew_val = skew(log_values)
         kurt_val = kurtosis(log_values)
+
         data_summary.append({
             "inducer_concentration": inducer,
             "Exposure (ms)": exposure,
@@ -565,31 +570,46 @@ def process_gfp_TMG_images(folder_path: str):
             "Kurtosis": kurt_val
         })
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
-        ax1.hist(values, bins=nbins)
-        ax1.set_title(f"Distribution for {inducer}, Exposure {exposure}")
-        ax2.hist(log_values,label= str(skew_val), bins=nbins)
+        # Fit skew-normal
         a, loc, scale = skewnorm.fit(log_values)
-
-        # Plot the skew-normal PDF
-        x = np.linspace(min(log_values), max(log_values), 100)
+        x = np.linspace(min(log_values), max(log_values), 200)
         pdf = skewnorm.pdf(x, a, loc, scale)
-
-        # Rescale to match histogram height
         bin_width = (max(log_values) - min(log_values)) / nbins
-        ax2.plot(x, pdf * len(log_values) * bin_width, 'r--',
-                 label=f"SkewNorm fit\nμ={loc:.2f}, σ={scale:.2f}, α={a:.2f}")
+        scaled_pdf = pdf * len(log_values) * bin_width
 
-        ax2.legend()
-        ax2.set_title(f"Log-Distribution for {inducer}, Exposure {exposure}")
-        plt.tight_layout()
-        plt.legend()
-        plt.savefig(f"./figures/0629\hist_{Ind}_{point_to_underscore(inducer)}_{exposure}_BGdevide.png")
+        # Create interactive Plotly figure
+        hist = go.Histogram(
+            x=log_values,
+            nbinsx=nbins,
+            name=fr'$Log \ Histogram$',
+            opacity=0.7,
+            marker=dict(color='lightblue'),
+        )
+
+        fit_line = go.Scatter(
+            x=x,
+            y=scaled_pdf,
+            mode='lines',
+            name=fr'$Fit \ ( \mu={loc:.2f},\ \sigma = {scale:.1f} \ skewness={skew_val:.1f})$',
+            line=dict(color='red', dash='dash')
+        )
+
+        layout = go.Layout(
+            title=fr'$Log-Distribution \ for \ {Ind} \ {inducer} [\mu M], \ Exposure \ {exposure}$',
+            xaxis=dict(title=fr'$log(Fluorescence \ Intensity)$',title_font=dict(size=28)),
+            yaxis=dict(title=fr'$Number \ of \ Bacteria$',title_font=dict(size=28)),
+            template='plotly_white',
+            legend=dict(x=0.99, y=0.99,font=dict(size=15), xanchor='right', yanchor='top')
+        )
+
+        fig = go.Figure(data=[hist, fit_line], layout=layout)
+        fig.show()
+        # fig.write_html(f"./figures/0629/hist_{Ind}_{point_to_underscore(inducer)}_{exposure}_BGdevide.html")
         # plt.show()
     df = pd.DataFrame(data_summary)
 
     # Save to CSV
-    df.to_csv(fr"C:\Users\carme\Documents\BioPhysics_python\figures\0629\image_statistics_summary_threshold{Threshold}_{Ind}.csv", index=False)
+    df.to_csv(fr"C:\Users\carme\Documents\BioPhysics_python\figures\0629\image_statistics_summary_threshold{Threshold}_{Ind}_10bins_no_trash.csv", index=False)
     return (all_ave_bact)
 
 
@@ -613,17 +633,17 @@ if __name__ == "__main__":
 
     # process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER),2.5)
 
-    # res_iptg = process_gfp_images(os.path.join(BASE_FOLDER_IPTG, PICTURE_FOLDER, MASKS_FOLDER),2.5)
-    # res_tmg = process_gfp_images(os.path.join(BASE_FOLDER_TMG, PICTURE_FOLDER, MASKS_FOLDER),7.5)
-    #
-    # # Or with custom labels:
-    # labels = ["IPTG", "TMG"]
-    # del res_iptg[800]
-    # del res_tmg[800]
-    # res_dict_list = [res_iptg, res_tmg]
-    # plot_multiple_res_dicts_grouped(res_dict_list, labels=labels, save_path="./figures/grouped_comparison.html")
+    res_iptg = process_gfp_images(os.path.join(BASE_FOLDER_IPTG, PICTURE_FOLDER, MASKS_FOLDER),2.5)
+    res_tmg = process_gfp_images(os.path.join(BASE_FOLDER_TMG, PICTURE_FOLDER, MASKS_FOLDER),7.5)
 
-    all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    # Or with custom labels:
+    labels = ["IPTG", "TMG"]
+    del res_iptg[800]
+    del res_tmg[800]
+    res_dict_list = [res_iptg, res_tmg]
+    plot_multiple_res_dicts_grouped(res_dict_list, labels=labels, save_path="./figures/grouped_comparison.html")
+
+    # all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
     # indices, labeled, aveMaskBacterium = bct.detect_each_bacteria(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_1_TMG_1_Phase_100.tif")
     # print(f"Found {len(indices)} bacteria.")
     # avebacterium=bct.compute_bacteria_intensities(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_2_TMG_1_GFP_5000.tif",indices)
