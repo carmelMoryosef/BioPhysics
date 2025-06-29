@@ -10,22 +10,26 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import tifffile
 import pandas as pd
+from matplotlib.pyplot import legend
+from requests import delete
+from skimage.io import imread
+from scipy.stats import skew, kurtosis
 # import cv2
-from extract_files import extract_and_rename_images 
+from extract_files import extract_and_rename_images
 from mask_enum import MaskType
 from os import path
 import analyze_bacterium as bct
-import os
 import json
-import tifffile
 from collections import defaultdict
 from scipy.optimize import curve_fit
 from plot_process_avg import plot_multiple_res_dicts_grouped
 from fit_functions import model, hillEq
-from consts import DARK_COUNT, BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER, PHASE_SUFFIX, MASK_PREFIX, GFP_FILE_INCLUDES, TMG_FOLDER, BACKGROUND,N,Threshold
+from consts import *
+from scipy.stats import skewnorm
 
 
-exclude_subfolders = ["BackGround","trash_measurments","CarmelShachar (1)","CarmelShachar","20250518"]
+exclude_subfolders = ["BackGround", "trash_measurments", "CarmelShachar (1)", "CarmelShachar", "20250518"]
+
 
 def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     """
@@ -42,7 +46,7 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
     dst_root_src = fr"{os.path.dirname(image_path)}\{MASKS_FOLDER}"
     dst_root = Path(dst_root_src)
     dst_root.mkdir(parents=True, exist_ok=True)
-    
+
     mask_path = fr"{dst_root_src}\mask_{name}.tif"
     res_path = fr"{dir_res}\results\res_{name}.csv"
 
@@ -67,7 +71,7 @@ def analyze_bacteria(image_path, with_pause=False, min_size=5, max_size=1e9):
 
     Prefs.blackBackground = True
     IJ.run(imp, "Convert to Mask", "")
-    IJ.run(imp, "Analyze Particles...", "size=30-170 circularity=0.50-1 show=Masks exclude clear summarize overlay")
+    IJ.run(imp, "Analyze Particles...", "size=30-170 circularity=0.5-1 show=Masks exclude clear summarize overlay")
     # IJ.saveAs("Results", res_path)
     mask_imp = IJ.getImage()
     imp.changes = False
@@ -108,7 +112,7 @@ def show_image(image_path):
     image = ij.io().open(image_path)
     ij.ui().show("Image", image)
     input("Press Enter to close...")
-    #david teaching me stuff
+    # david teaching me stuff
 
 
 def analyze_all_pictures(image_folder):
@@ -122,7 +126,7 @@ def analyze_all_pictures(image_folder):
         # mask = analyze_bacteria(f"./{rel_path}")
         mask = analyze_bacteria(str(image_path.absolute()))
         # show_image(mask)
-        #but its too late for my brain
+        # but its too late for my brain
     print(f"[V] Done!")
 
 
@@ -148,6 +152,7 @@ def load_tiff_grayscale(filepath):
     except Exception as e:
         print(f"Error loading TIFF file: {e}")
         return None
+
 
 # def rgb2gray(rgb):
 #     return np.dot(rgb[..., :3], [0.2989, 0.5870, 0.1140])
@@ -175,7 +180,8 @@ def background_picture_gradient(bg_folder_path):
             continue
 
         # Look for the inner subfolder
-        inner_subfolders = [d for d in os.listdir(outer_folder_path) if os.path.isdir(os.path.join(outer_folder_path, d))]
+        inner_subfolders = [d for d in os.listdir(outer_folder_path) if
+                            os.path.isdir(os.path.join(outer_folder_path, d))]
         if not inner_subfolders:
             print(f"[!] No subfolder inside {outer_folder_path}")
             continue
@@ -205,6 +211,7 @@ def background_picture_gradient(bg_folder_path):
     print(f"[V] Averaged {len(image_list)} background images.")
     return mean_image
 
+
 def background_adjustments(image, bg_picture):
     # before extracting pixel correlated to mask, background reductions should be made in this order:
     # dark count subtract
@@ -212,15 +219,17 @@ def background_adjustments(image, bg_picture):
     image = image - DARK_COUNT
     if np.any(image < 0):
         print("negative after Dark count")
-    image_withnoBG = image / (bg_picture/10)
+    image_withnoBG = image / (bg_picture / 10)
     if np.any(image_withnoBG < 0):
         print("negative after division")
     # plt.imshow(image_withnoBG, cmap="gray")
     return image_withnoBG
 
-def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, bg_picture: str, plot_each_image:bool=False) -> float:
+
+def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, bg_picture: str,
+                       plot_each_image: bool = False) -> float:
     # Load and convert to grayscale
-    image = Image.open(image_path)#.convert("L")
+    image = Image.open(image_path)  # .convert("L")
     mask = Image.open(mask_path).convert("L")
 
     image_array = np.array(image)
@@ -237,7 +246,7 @@ def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, bg_
     # print(len(pixel_values))
     # print(image_path)
     # print(np.min(image_array), np.max(image_array))
-    
+
     if plot_each_image:
         # Plot the image
         plt.figure(figsize=(8, 8))
@@ -248,7 +257,7 @@ def mean_value_at_mask(image_path: str, mask_path: str, mask_type: MaskType, bg_
         plt.axis('off')
         plt.show()
 
-    return np.mean(pixel_values) #/ np.mean(image_array)
+    return [np.mean(pixel_values),np.std(pixel_values/np.mean(pixel_values))]  # / np.mean(image_array)
 
 
 def extract_numeric_prefix(filename: str) -> int:
@@ -260,10 +269,12 @@ def extract_numeric_prefix(filename: str) -> int:
     else:
         raise ValueError(f"[X] Filename does not start with a number: {filename}")
 
-def get_exposure(filename:str):
+
+def get_exposure(filename: str):
     return int(filename.split("_")[-1].split(".")[0])
 
-def process_gfp_images(folder_path: str):
+
+def process_gfp_images(folder_path: str,UpperBound):
     """
     Finds all 'GFP' images in the folder, computes mean values for masked areas,
     and plots the results.
@@ -288,17 +299,17 @@ def process_gfp_images(folder_path: str):
                 dig = prefix_match.group(2)
                 prefix = prefix_match.group(1) if prefix_match else filename.split(GFP_FILE_INCLUDES)[0]
                 if len(dig) == 1:
-                    prefix = prefix + f"_{dig}" 
+                    prefix = prefix + f"_{dig}"
             except Exception as e:
                 print(f"Error in finding prefix {filename}: {e}")
 
             # Search for a matching phase file
             phase_file = None
             for candidate in all_files:
-                if (candidate.startswith(prefix) and 
-                    # re.search(r'phase', candidate, re.IGNORECASE) and 
-                    not re.search(GFP_FILE_INCLUDES, candidate) and 
-                    candidate.endswith(".tif")):
+                if (candidate.startswith(prefix) and
+                        # re.search(r'phase', candidate, re.IGNORECASE) and
+                        not re.search(GFP_FILE_INCLUDES, candidate) and
+                        candidate.endswith(".tif")):
                     phase_file = candidate
                     break
 
@@ -308,16 +319,18 @@ def process_gfp_images(folder_path: str):
 
             mask_path = os.path.join(folder_path, phase_file)
             exposure = get_exposure(filename)
-            
+
             try:
                 x_value = extract_numeric_prefix(filename)
                 # print(x_value)
-                mean_val = mean_value_at_mask(image_path, mask_path, MaskType.BLACK, bg_gradient)
-                background_mean_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
+                mean_val,std_val = mean_value_at_mask(image_path, mask_path, MaskType.BLACK, bg_gradient)
+                background_mean_val,BG_std_val = mean_value_at_mask(image_path, mask_path, MaskType.WHITE, bg_gradient)
                 # print(mean_val, background_mean_val)
                 if mean_val < background_mean_val:
-                    print(f"[?] The background is lighter then the bacteria - file {filename}, diff: {background_mean_val - mean_val}")
-                results.append((x_value, (abs((mean_val)-background_mean_val))*N, background_mean_val, exposure))# i added background simple value
+                    print(
+                        f"[?] The background is lighter then the bacteria - file {filename}, diff: {background_mean_val - mean_val}")
+                results.append((x_value, (((mean_val)/ background_mean_val)) * N, (BG_std_val * N )/2,
+                                exposure))  # i added background simple value
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
 
@@ -327,7 +340,7 @@ def process_gfp_images(folder_path: str):
         # Sort by x-value (numeric prefix)
     results.sort(key=lambda x: x[0])
     # print(results)
-    x_vals, y_vals, background_mean_val, exposure_vals = zip(*results)
+    x_vals, y_vals, BG_std_val, exposure_vals = zip(*results)
 
     # Convert to numpy arrays for indexing
     x_vals = np.array(x_vals)
@@ -343,7 +356,7 @@ def process_gfp_images(folder_path: str):
 
     # Plot all fits
     plt.figure(figsize=(8, 5))
-    
+
     res_dict = dict()
 
     for exp in unique_exposures:
@@ -367,78 +380,78 @@ def process_gfp_images(folder_path: str):
         # Convert to numpy arrays for fitting
         x_exp = np.array(x_avg)
         y_exp = np.array(y_avg)
-        y_exp_60 = y_exp[(x_exp <= 50) | (x_exp>=70)]
-        x_exp_60 = x_exp[(x_exp<=50) | (x_exp>=70)]
-        
-        res_dict[exp] = dict(x=x_exp_60, y=y_exp_60)
-        #try to do somthing for hill coefficient
-        R=(y_exp-y_exp[x_exp.argmin()])/(y_exp[y_exp.argmax()]-y_exp[x_exp.argmin()]) #y_exp[x_exp.argmin()]
-        # Fit
-        initial_guess = [7, 100, 0.5, 2, 0,1]  # D, R, C, n, Y0
-        lower_bounds = [0, 0, 0, 1, -1000,-1000]  # R >= 0 enforced here
-        upper_bounds = [np.inf] * 3 + [4,np.inf,np.min(x_exp)]
-        initial_guess_hill = [1,6]  # Kd,n
-        lower_bounds_hill= [0,0.9]  # R >= 0 enforced here
-        upper_bounds_hill= [np.inf,9]
-        try:
-            params, cov = curve_fit(
-            model, x_exp_60, y_exp_60,
-            p0=initial_guess,
-            bounds=(lower_bounds, upper_bounds),
-            maxfev=10000)
-            params_hill, cov_hill = curve_fit(
-            hillEq, x_exp, R,
-            p0=initial_guess_hill,
-            bounds=(lower_bounds_hill, upper_bounds_hill),
-            maxfev=100000)
+        y_exp_60 = y_exp#[(x_exp <= 50) | (x_exp >= 70)]
+        x_exp_60 = x_exp#[(x_exp <= 50) | (x_exp >= 70)]
 
-            # Unpack parameters and errors
-            D_fit, R_fit, C_fit, n_fit, Y0_fit, X0_fit= params
-            Kd_hillfit, n_hillfit=params_hill
-            # Format label with ± uncertainties
-            label = (f'Exp {exp} | Kd={Kd_hillfit:.1f}, '
-                                        f'n={n_hillfit:.2f}')
-            # label = (f'Exp {exp} | D={D_fit:.1f}, '
-            #          f'R={R_fit:.1f}'
-            #          f'C={C_fit:.4f}'
-            #          f'n={n_fit:.1f}'
-            #          f'X₀={Y0_fit:.2f}')
+        res_dict[exp] = dict(x=x_exp_60, y=y_exp_60,error=BG_std_val)
+        # try to do somthing for hill coefficient
+        # R = (y_exp - y_exp[x_exp.argmin()]) / (y_exp[y_exp.argmax()] - y_exp[x_exp.argmin()])  # y_exp[x_exp.argmin()]
+        # Fit
+        initial_guess = [7, 100, 0.5, 2, 0, 1]  # D, R, C, n, Y0
+        lower_bounds = [0, 0, 0, 1, -1000, -1000]  # R >= 0 enforced here
+        upper_bounds = [np.inf] * 3 + [UpperBound, np.inf, np.min(x_exp)]
+        # initial_guess_hill = [1, 6]  # Kd,n
+        # lower_bounds_hill = [0, 0.9]  # R >= 0 enforced here
+        # upper_bounds_hill = [np.inf, 9]
+        # try:
+        #     params, cov = curve_fit(
+        #         model, x_exp_60, y_exp_60,
+        #         p0=initial_guess,
+        #         bounds=(lower_bounds, upper_bounds),
+        #         maxfev=100000)
+        #     # params_hill, cov_hill = curve_fit(
+        #     #     hillEq, x_exp, R,
+        #     #     p0=initial_guess_hill,
+        #     #     bounds=(lower_bounds_hill, upper_bounds_hill),
+        #     #     maxfev=100000)
+        #
+        #     # Unpack parameters and errors
+        #     D_fit, R_fit, C_fit, n_fit, Y0_fit, X0_fit = params
+        #     # Kd_hillfit, n_hillfit = params_hill
+        #     # Format label with ± uncertainties
+        #     # label = (f'Exp {exp} | Kd={Kd_hillfit:.1f}, '
+        #     #          f'n={n_hillfit:.2f}')
+        #     label = (f'Exp {exp} | D={D_fit:.1f}, '
+        #              f'R={R_fit:.1f}'
+        #              f'C={C_fit:.4f}'
+        #              f'n={n_fit:.1f}'
+        #              f'Y₀={Y0_fit:.2f}')
 
             # uncertainties = np.sqrt(np.diag(covariance))
-        except RuntimeError:
-            print(f"Fit failed for exposure {exp} param= {params_hill}")
-            continue
+        # except RuntimeError:
+        #     print(f"Fit failed for exposure {exp} param= {params}")
+        #     continue
 
         # Plot
-        color = cmap(norm(exp))
-        # plt.scatter(x_exp, y_exp, color=color)
-        plt.scatter(x_exp, R, color=color)
-
-        x_fit = np.linspace(min(x_exp), max(x_exp), 500)
-        y_fit = model(x_fit, *params)
-        x_hill = np.linspace(min(x_exp), max(x_exp), 500)
-        R_hill = hillEq(x_hill, *params_hill)
-        # plt.axvline(Kd_hillfit, color=color)
-        # plt.plot(x_fit, y_fit, color=color, label=label)
-        plt.plot(x_hill, R_hill, color=color, label=label)
-    # plt.plot(x_fit, y_fit, color='b', label='Fit')
-    # plt.axhline(0.5,color="black")
-    plt.legend()
-
-    # plt.scatter(x_vals, background_mean_val, marker="*", color=cmap(norm(exposure_vals)))
-    # add y line at avrage of background_mean_val
-    # plt.plot([min(x_vals), max(x_vals)],[np.mean(background_mean_val),np.mean(background_mean_val)], color=cmap(norm(exposure_vals)))
-    # plt.ylim((0,1100))
-    # plt.scatter(x_vals, BG_vals, marker='*')#mean background
-    plt.xlabel("Inducer")
-    plt.ylabel("Mean value in non-black mask region")
-    plt.ylabel("R")
-    plt.title("Mean GFP Intensity over Time/Image Index")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f"./figures/hillco_fit_N{N}_threshold{Threshold}_TMG_BGsubstraction_no10_06_xmin.png")
-    # plt.show()
-    # plt.savefig(f"./figures/fit_{N}_threshold{Threshold}.png")
+    #     color = cmap(norm(exp))
+    #     plt.scatter(x_exp, y_exp, color=color)
+    #     # plt.scatter(x_exp, R, color=color)
+    #
+    #     x_fit = np.linspace(min(x_exp), max(x_exp), 500)
+    #     y_fit = model(x_fit, *params)
+    #     # x_hill = np.linspace(min(x_exp), max(x_exp), 500)
+    #     # R_hill = hillEq(x_hill, *params_hill)
+    #     # plt.axvline(Kd_hillfit, color=color)
+    #     plt.plot(x_fit, y_fit, color=color, label=label)
+    #     # plt.plot(x_hill, R_hill, color=color, label=label)
+    # # plt.plot(x_fit, y_fit, color='b', label='Fit')
+    # # plt.axhline(0.5,color="black")
+    # plt.legend()
+    #
+    # # plt.scatter(x_vals, background_mean_val, marker="*", color=cmap(norm(exposure_vals)))
+    # # add y line at avrage of background_mean_val
+    # # plt.plot([min(x_vals), max(x_vals)],[np.mean(background_mean_val),np.mean(background_mean_val)], color=cmap(norm(exposure_vals)))
+    # # plt.ylim((0,1100))
+    # # plt.scatter(x_vals, BG_vals, marker='*')#mean background
+    # plt.xlabel("Inducer")
+    # plt.ylabel("Mean value in non-black mask region")
+    # plt.ylabel("R")
+    # plt.title("Mean GFP Intensity over Time/Image Index")
+    # plt.grid(True)
+    # plt.tight_layout()
+    # plt.savefig(f"./figures/fit_N{N}_threshold{Threshold}_{Ind}_BGnorm_no10.png")
+    # # plt.show()
+    # # plt.savefig(f"./figures/fit_{N}_threshold{Threshold}.png")
     return res_dict
 
 
@@ -446,8 +459,8 @@ def underscore_to_point(s: str) -> str:
     """
     Converts underscores in a string to periods.
     """
-    return float(s.replace('_', '.')
-)
+    return float(s.replace('_', '.'))
+
 
 def point_to_underscore(s: str) -> str:
     """
@@ -455,7 +468,8 @@ def point_to_underscore(s: str) -> str:
     """
     return str(s).replace('.', '_')
 
-#TODO remove code duplications
+
+# TODO remove code duplications
 def process_gfp_TMG_images(folder_path: str):
     """
     Finds all 'GFP' images in the folder, computes mean values for masked areas,
@@ -469,7 +483,7 @@ def process_gfp_TMG_images(folder_path: str):
     # bg_gradient = background_picture_gradient(BACKGROUND)
 
     all_files = os.listdir(folder_path)
-    all_ave_bact={}
+    all_ave_bact = {}
     # pattern = r'mask_\d+_(\d+_\d+_[A-Z])_(\d+)_GFP'
     # pattern = r'mask_(?:_(\d+))?_(?:TMG|TMD)_(\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
     # pattern = r'(.+?)_(\d+_\d+)_[A-Z]_(?:TMG|TMD)_(?:\d+)_GFP_(?:_(\d+))?(3000|5000|800|100)'
@@ -482,13 +496,13 @@ def process_gfp_TMG_images(folder_path: str):
             try:
                 image_path = os.path.join(folder_path, filename)
                 print("im still working")
-                
+
                 match = re.search(pattern, filename)
-                inducer = underscore_to_point(match.group(2))
+                inducer = extract_numeric_prefix(filename)
                 exposure = match.group(4)
 
                 # Try to extract prefix before "_GFP" or other suffix
-                #(.+?)_(\d+)_(?:TMG|TMD)_(\d+)_GFP
+                # (.+?)_(\d+)_(?:TMG|TMD)_(\d+)_GFP
                 prefix_match = re.match(r"(.+?)_(\d+)_GFP", filename)
                 # prefix_match = re.match(r"(.+?)(?:_(\d+))?_(?:TMG|TMD)_(\d+)_GFP", filename)
                 dig = prefix_match.group(2)
@@ -526,31 +540,57 @@ def process_gfp_TMG_images(folder_path: str):
                 # print(mean_val, background_mean_val)
                 # if mean_val < background_mean_val:
                 #     print(f"[?] The background is lighter then the bacteria - file {filename}")
-                if len(indices)>1:
+                if len(indices) > 1:
                     if (inducer, exposure) in all_ave_bact:
-                        #TODO carmel, like this? 
+                        # TODO carmel, like this?
                         all_ave_bact[(inducer, exposure)].extend(avebacterium)
                     else:
                         all_ave_bact[(inducer, exposure)] = avebacterium
             except Exception as e:
                 print(f"Error processing TMG {filename}: {e}")
-                
+    data_summary = []
     for (inducer, exposure), values in all_ave_bact.items():
         nbins = max(10, len(values) // 10)
+        log_values = np.log(values)
+        mean_val = np.mean(log_values)
+        std_val = np.std(log_values)
+        skew_val = skew(log_values)
+        kurt_val = kurtosis(log_values)
+        data_summary.append({
+            "inducer_concentration": inducer,
+            "Exposure (ms)": exposure,
+            "Mean": mean_val,
+            "Std": std_val,
+            "Skew": skew_val,
+            "Kurtosis": kurt_val
+        })
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
         ax1.hist(values, bins=nbins)
         ax1.set_title(f"Distribution for {inducer}, Exposure {exposure}")
-        ax2.hist(np.log(values), bins=nbins)
+        ax2.hist(log_values,label= str(skew_val), bins=nbins)
+        a, loc, scale = skewnorm.fit(log_values)
+
+        # Plot the skew-normal PDF
+        x = np.linspace(min(log_values), max(log_values), 100)
+        pdf = skewnorm.pdf(x, a, loc, scale)
+
+        # Rescale to match histogram height
+        bin_width = (max(log_values) - min(log_values)) / nbins
+        ax2.plot(x, pdf * len(log_values) * bin_width, 'r--',
+                 label=f"SkewNorm fit\nμ={loc:.2f}, σ={scale:.2f}, α={a:.2f}")
+
+        ax2.legend()
         ax2.set_title(f"Log-Distribution for {inducer}, Exposure {exposure}")
         plt.tight_layout()
-        plt.savefig(f"./figures/hist_TMG_{point_to_underscore(inducer)}_{exposure}_noBGmenipolation.png")
+        plt.legend()
+        plt.savefig(f"./figures/0629\hist_{Ind}_{point_to_underscore(inducer)}_{exposure}_BGdevide.png")
         # plt.show()
+    df = pd.DataFrame(data_summary)
 
-
-
+    # Save to CSV
+    df.to_csv(fr"C:\Users\carme\Documents\BioPhysics_python\figures\0629\image_statistics_summary_threshold{Threshold}_{Ind}.csv", index=False)
     return (all_ave_bact)
-
 
 
 if __name__ == "__main__":
@@ -560,7 +600,7 @@ if __name__ == "__main__":
     Prefs = jimport('ij.Prefs')
     WM = jimport('ij.WindowManager')
 
-    #TODO shachar fix the folders so it can loop over all the dates folders
+    # TODO shachar fix the folders so it can loop over all the dates folders
     # bg_mean = background_picture_gradient(BACKGROUND)
     # plt.imshow(bg_mean, cmap="gray")
     # plt.title("Mean Background Image")
@@ -570,19 +610,20 @@ if __name__ == "__main__":
     # extract_and_rename_images(f"{BASE_FOLDER}", f"{BASE_FOLDER}/{PICTURE_FOLDER}", exclude_subfolders)
     # analyze_bacteria(r"G:\My Drive\bio_physics\pictures\52_5_A_2_Phase_100.tif")[!] analyzing 20250520_70_A_2_GFP_3000.tif...
     # analyze_all_pictures(f"{BASE_FOLDER}/{PICTURE_FOLDER}")
-    #
-    # process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
-    
-    
-    res_iptg = process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
-    res_tmg = process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, TMG_FOLDER, MASKS_FOLDER))
 
-    # Or with custom labels:
-    labels = ["IPTG", "TMG"]
-    res_dict_list = [res_iptg, res_tmg]
-    plot_multiple_res_dicts_grouped(res_dict_list, labels=labels, save_path="./figures/grouped_comparison.png")
-    
-    # all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    # process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER),2.5)
+
+    # res_iptg = process_gfp_images(os.path.join(BASE_FOLDER_IPTG, PICTURE_FOLDER, MASKS_FOLDER),2.5)
+    # res_tmg = process_gfp_images(os.path.join(BASE_FOLDER_TMG, PICTURE_FOLDER, MASKS_FOLDER),7.5)
+    #
+    # # Or with custom labels:
+    # labels = ["IPTG", "TMG"]
+    # del res_iptg[800]
+    # del res_tmg[800]
+    # res_dict_list = [res_iptg, res_tmg]
+    # plot_multiple_res_dicts_grouped(res_dict_list, labels=labels, save_path="./figures/grouped_comparison.html")
+
+    all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
     # indices, labeled, aveMaskBacterium = bct.detect_each_bacteria(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_1_TMG_1_Phase_100.tif")
     # print(f"Found {len(indices)} bacteria.")
     # avebacterium=bct.compute_bacteria_intensities(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_2_TMG_1_GFP_5000.tif",indices)
@@ -591,7 +632,6 @@ if __name__ == "__main__":
     # plt.show()
     # plt.hist(avebacterium, bins=50)
     # plt.show()
-
 
     # print("First bacterium indices:", indices[0])
     # mean_val = mean_value_at_black_mask(r"G:\My Drive\bio_physics\pictures\210_B_3_GFP_3000.tif", r"G:\My Drive\bio_physics\pictures\masks\mask_52_5_A_2_Phase_100.tif")
