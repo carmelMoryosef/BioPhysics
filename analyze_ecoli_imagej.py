@@ -553,8 +553,8 @@ def process_gfp_TMG_images(folder_path: str):
                 print(f"Error processing TMG {filename}: {e}")
     data_summary = []
     for (inducer, exposure), values in all_ave_bact.items():
-        # if inducer != 35 and inducer!=33: continue
-        nbins = max(15, len(values) // 10)
+        if inducer != 35 and inducer!=33: continue
+        nbins = 70#max(30, len(values) // 7)
         print(nbins)
         log_values = np.log(values)
         mean_val = np.mean(log_values)
@@ -562,12 +562,20 @@ def process_gfp_TMG_images(folder_path: str):
         skew_val = skew(log_values)
         kurt_val = kurtosis(log_values)
 
+
+        n = len(log_values)
+
+        # Standard error of skewness
+        SE_skew = np.sqrt(6 * n * (n - 1) / ((n - 2) * (n + 1) * (n + 3)))
+        print(f"Skewness = {skew_val:.3f} ± {SE_skew:.3f}")
+
         data_summary.append({
             "inducer_concentration": inducer,
             "Exposure (ms)": exposure,
             "Mean": mean_val,
             "Std": std_val,
             "Skew": skew_val,
+            "skew_error": SE_skew,
             "Kurtosis": kurt_val
         })
 
@@ -598,10 +606,10 @@ def process_gfp_TMG_images(folder_path: str):
 
         layout = go.Layout(
             title=fr'$Log-Distribution \ for \ {Ind} \ {inducer} [\mu M], \ Exposure \ {exposure}$',
-            xaxis=dict(title=fr'$log(Fluorescence \ Intensity)$',title_font=dict(size=28)),
-            yaxis=dict(title=fr'$Number \ of \ Bacteria$',title_font=dict(size=28)),
+            xaxis=dict(title=fr'$log(Fluorescence \ Intensity)$',title_font=dict(size=34),tickfont = dict(size=17)),
+            yaxis=dict(title=fr'$Number \ of \ Bacteria$',title_font=dict(size=34),tickfont = dict(size=17)),
             template='plotly_white',
-            legend=dict(x=0.99, y=0.99,font=dict(size=15), xanchor='right', yanchor='top')
+            legend=dict(x=0.99, y=0.99,font=dict(size=16), xanchor='right', yanchor='top')
         )
 
         fig = go.Figure(data=[hist, fit_line], layout=layout)
@@ -611,7 +619,7 @@ def process_gfp_TMG_images(folder_path: str):
     df = pd.DataFrame(data_summary)
 
     # Save to CSV
-    df.to_csv(fr"C:\Users\carme\Documents\BioPhysics_python\figures\0629\image_statistics_summary_threshold{Threshold}_{Ind}_10bins_no_trash.csv", index=False)
+    # df.to_csv(fr"C:\Users\carme\Documents\BioPhysics_python\figures\0629\image_statistics_summary_threshold{Threshold}_{Ind}_10bins_no_trash_try.csv", index=False)
     return (all_ave_bact)
 
 
@@ -635,17 +643,17 @@ if __name__ == "__main__":
 
     # process_gfp_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER),2.5)
 
-    res_iptg = process_gfp_images(os.path.join(BASE_FOLDER_IPTG, PICTURE_FOLDER, MASKS_FOLDER),2.5)
-    res_tmg = process_gfp_images(os.path.join(BASE_FOLDER_TMG, PICTURE_FOLDER, MASKS_FOLDER),7.5)
-
-    # Or with custom labels:
-    labels = ["IPTG", "TMG"]
-    del res_iptg[800]
-    del res_tmg[800]
-    res_dict_list = [res_iptg, res_tmg]
-    plot_multiple_res_dicts_grouped(res_dict_list, labels=labels, save_path="./figures/grouped_comparison.html")
-
-    # all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
+    # res_iptg = process_gfp_images(os.path.join(BASE_FOLDER_IPTG, PICTURE_FOLDER, MASKS_FOLDER),2.5)
+    # res_tmg = process_gfp_images(os.path.join(BASE_FOLDER_TMG, PICTURE_FOLDER, MASKS_FOLDER),7.5)
+    #
+    # # Or with custom labels:
+    # labels = ["IPTG", "TMG"]
+    # del res_iptg[800]
+    # del res_tmg[800]
+    # res_dict_list = [res_iptg, res_tmg]
+    # plot_multiple_res_dicts_grouped(res_dict_list, labels=labels, save_path="./figures/grouped_comparison.html")
+    # #
+    all_ave_bacterium=process_gfp_TMG_images(os.path.join(BASE_FOLDER, PICTURE_FOLDER, MASKS_FOLDER))
     # indices, labeled, aveMaskBacterium = bct.detect_each_bacteria(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_1_TMG_1_Phase_100.tif")
     # print(f"Found {len(indices)} bacteria.")
     # avebacterium=bct.compute_bacteria_intensities(f"{BASE_FOLDER}/{PICTURE_FOLDER}/{MASKS_FOLDER}/mask_20250608_31_3_A_2_TMG_1_GFP_5000.tif",indices)

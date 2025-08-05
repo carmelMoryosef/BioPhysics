@@ -141,9 +141,9 @@ def plot_multiple_res_dicts_grouped(res_dict_array, labels=None, save_path=None,
                     y=y_fit,
                     mode='lines',
                     line=dict(color=dataset_color, width=2, dash='dash' if exp != 3000 else 'solid'),
-                    name=f"Fit: {legend_label}",
+                    name=rf"$Fit: \ n={n_fit:.2f}$",
                     legendgroup=f"dataset_{dataset_idx}",
-                    showlegend=False,  # Don't show fit lines in legend to avoid clutter
+                  # Don't show fit lines in legend to avoid clutter
                     # hovertemplate=f"Fit: {legend_label}<br>Kd: {Kd_hillfit:.2f}<br>n: {n_hillfit:.2f}<extra></extra>"
                 ))
                 
@@ -160,25 +160,27 @@ def plot_multiple_res_dicts_grouped(res_dict_array, labels=None, save_path=None,
         # ),
         xaxis=dict(
             title=r"$Inducer \ Concentration \ [\mu M]$",
-            title_font=dict(size=28),
+            title_font=dict(size=34),
             showgrid=True,
             gridwidth=1,
-            gridcolor='lightgray'
+            dtick=20,
+            gridcolor='lightgray',
+            tickfont = dict(size=17)
         ),
         yaxis=dict(
-            title=r"$Intensity \ [\#] $",
-            title_font=dict(size=28),
+            title=r"$Mean \ Intensity \ [\#] $",
+            title_font=dict(size=34),
             showgrid=True,
             gridwidth=1,
-            gridcolor='lightgray'
+            gridcolor='lightgray',
+            tickfont = dict(size=17)
         ),
         legend=dict(
-            x=0.65,
+            x=0.7,
             y=0.05,
-            font=dict(size=15)
+            font=dict(size=16)
         ),
-        width=1200,
-        height=650,
+
         template='plotly_white'
     )
     
