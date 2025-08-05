@@ -553,6 +553,7 @@ def process_gfp_TMG_images(folder_path: str):
                 print(f"Error processing TMG {filename}: {e}")
     data_summary = []
     for (inducer, exposure), values in all_ave_bact.items():
+        # if inducer != 35 and inducer!=33: continue
         nbins = max(15, len(values) // 10)
         print(nbins)
         log_values = np.log(values)
@@ -571,6 +572,7 @@ def process_gfp_TMG_images(folder_path: str):
         })
 
         # Fit skew-normal
+        log_values = log_values / np.linalg.norm(log_values)
         a, loc, scale = skewnorm.fit(log_values)
         x = np.linspace(min(log_values), max(log_values), 200)
         pdf = skewnorm.pdf(x, a, loc, scale)
